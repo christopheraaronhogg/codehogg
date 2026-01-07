@@ -1,8 +1,8 @@
 # codehogg
 
-**20 specialized agents with 19 domain skills for Claude Code.**
+**27 specialized agents with 20 domain skills for Claude Code.**
 
-Comprehensive codebase audits, feature planning, and implementation guidance through a three-tier architecture of agents, skills, and commands.
+Comprehensive codebase audits, feature planning, UX persona testing, and implementation guidance through a three-tier architecture of agents, skills, and commands.
 
 ## Installation
 
@@ -43,7 +43,7 @@ codehogg uses a three-tier system that maps to Claude Code's native constructs:
 └── commands/  # Orchestration (user-invoked slash commands)
 ```
 
-### Agents (20)
+### Agents (27)
 
 Specialized workers that run in their own context window. Each agent:
 - Has a focused persona and expertise
@@ -52,7 +52,7 @@ Specialized workers that run in their own context window. Each agent:
 - References skills for domain knowledge
 - Can be proactively triggered by Claude when relevant
 
-### Skills (19)
+### Skills (20)
 
 Domain knowledge that Claude loads automatically when your request matches the skill's description. Skills contain:
 - Evaluation frameworks and methodologies
@@ -60,7 +60,7 @@ Domain knowledge that Claude loads automatically when your request matches the s
 - Report templates and output formats
 - Best practices and red flags
 
-### Commands (53)
+### Commands (57)
 
 Slash commands you invoke explicitly. Commands:
 - Orchestrate which agents to run
@@ -69,6 +69,8 @@ Slash commands you invoke explicitly. Commands:
 - Compile summaries from multiple agents
 
 ## The Agents
+
+### Consultant Agents (18)
 
 | Agent | Expertise | Model |
 |-------|-----------|-------|
@@ -90,8 +92,25 @@ Slash commands you invoke explicitly. Commands:
 | stack-consultant | Framework best practices | Opus |
 | ui-design-consultant | Visual design, AI slop | Opus |
 | ux-consultant | Usability, accessibility | Opus |
-| explore-concepts | Creative direction generation | Opus |
-| implementer | Feature implementation | Sonnet |
+
+### UX Persona Agents (7)
+
+| Agent | Simulates | Focus |
+|-------|-----------|-------|
+| ux-personas-orchestrator | Research coordinator | Spawns & synthesizes all personas |
+| ux-persona-sarah | Small business owner | Mobile, discovery, pricing |
+| ux-persona-mike | Experienced decorator | Desktop, comparison, quality |
+| ux-persona-jenny | Rush order handler | Desktop, speed, efficiency |
+| ux-persona-carlos | Mobile-first user | Mobile, status checks |
+| ux-persona-david | Accessibility user | Keyboard only, a11y |
+| ux-persona-patricia | Skeptical shopper | Desktop, trust verification |
+
+### Creative & Implementation Agents (2)
+
+| Agent | Purpose | Model |
+|-------|---------|-------|
+| explore-concepts | Generate 3 distinct design directions | Opus |
+| implementer | Execute implementation from plans | Sonnet |
 
 ## Commands
 
@@ -123,6 +142,17 @@ Plan new features before implementation:
 | `/plan-security` | Security requirements |
 | ... | (mirrors audit commands) |
 
+### UX Persona Testing Commands
+
+Simulate real user research with browser-based persona agents:
+
+| Command | Description |
+|---------|-------------|
+| `/test-ux-personas` | Full suite: 6 personas attempting real tasks |
+| `/test-ux-persona {name}` | Single persona with custom task |
+| `/test-ux-quick` | Fast smoke test: 2 key personas |
+| `/test-ux-a11y` | Deep accessibility testing with keyboard-only user |
+
 ### Creative Commands
 
 | Command | Description |
@@ -135,6 +165,65 @@ Plan new features before implementation:
 |---------|-------------|
 | `/implement-solo` | Main agent implements from plan |
 | `/implement-team` | Parallel delegation for independent tasks |
+
+## UX Persona Testing
+
+A unique feature: **simulated user research** using Claude's browser capabilities.
+
+### How It Works
+
+Instead of traditional automated tests, codehogg spawns intelligent agents that:
+1. **Embody a specific user persona** (tech level, patience, goals)
+2. **Open a real browser** with appropriate viewport
+3. **Attempt real tasks** as that persona would
+4. **Document friction** with screenshots and judgment
+5. **Report findings** including emotional experience
+
+### The Personas
+
+| Persona | Archetype | Device | Patience | Focus |
+|---------|-----------|--------|----------|-------|
+| Sarah | Small business owner | Mobile | Medium | "Is this for me?" |
+| Mike | Experienced professional | Desktop | Low | "Worth switching?" |
+| Jenny | Rush order handler | Desktop | Very Low | "Need this NOW" |
+| Carlos | Mobile-first user | Mobile | Low | "Quick status check" |
+| David | Accessibility user | Keyboard | High | "Can I use this?" |
+| Patricia | Skeptical shopper | Desktop | High | "Is this legit?" |
+
+### Example Output
+
+```markdown
+## UX Personas Test Results
+
+| Persona | Task | Result | Time | Friction |
+|---------|------|--------|------|----------|
+| Sarah | Sign up | ❌ Failed | 3:42 | High |
+| Mike | Compare | ✅ Success | 2:15 | Low |
+| Jenny | Rush order | ✅ Success | 4:58 | Medium |
+| Carlos | Check status | ❌ Failed | - | Critical |
+| David | Keyboard nav | ❌ Failed | - | Critical |
+| Patricia | Trust check | ✅ Success | 8:30 | Medium |
+
+**Success Rate:** 50% (3 of 6 completed tasks)
+
+**Critical Finding:** Mobile users can't find order status
+```
+
+### Running Persona Tests
+
+```bash
+# Full suite (6 personas, ~20 minutes)
+/test-ux-personas --url http://localhost:3000
+
+# Quick smoke test (2 personas, ~5 minutes)
+/test-ux-quick --url http://localhost:3000
+
+# Single persona with custom task
+/test-ux-persona sarah --url http://localhost:3000 --task "find pricing and sign up"
+
+# Accessibility deep-dive
+/test-ux-a11y --url http://localhost:3000
+```
 
 ## How It Works
 
@@ -186,6 +275,18 @@ planning-docs/{feature-slug}/
 ├── 01-product-spec.md
 ├── ...
 └── 18-seo-requirements.md
+```
+
+### UX Persona Reports
+
+```
+audit-reports/ux-personas-{timestamp}/
+├── 00-executive-summary.md
+├── 01-sarah-small-business-owner.md
+├── 02-mike-experienced-decorator.md
+├── ...
+├── screenshots/
+└── 99-prioritized-recommendations.md
 ```
 
 ## Project Integration
@@ -266,6 +367,13 @@ Get 3 distinct directions with physical metaphors:
 - Industrial Command Center (dense, dark, monospace)
 - Editorial Magazine (whitespace, serif, storytelling)
 - Playful Mosaic (bento grid, animations, discovery)
+
+### Test Real User Experience
+
+```
+/test-ux-personas --url http://localhost:3000
+```
+Get feedback from 6 simulated users with different needs, devices, and patience levels.
 
 ## License
 
