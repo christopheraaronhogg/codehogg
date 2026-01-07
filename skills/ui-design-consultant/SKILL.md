@@ -88,6 +88,39 @@ Evaluate UI components:
 - Icon usage and sizing
 - State indicators (hover, active, disabled)
 
+### 6. Design System Coherence
+
+Assess design system maturity and completeness:
+
+| Aspect | Evaluation |
+|--------|------------|
+| **Token Coverage** | Are colors, spacing, typography tokenized? |
+| **Component Library** | Is there a documented component set? |
+| **Naming Conventions** | Consistent, semantic naming? |
+| **Documentation** | Are patterns documented with usage guidelines? |
+| **Scalability** | Can it accommodate new features? |
+| **Dark Mode Support** | Systematic dark theme tokens? |
+| **Responsive Tokens** | Breakpoint-aware spacing/typography? |
+
+#### Design System Maturity Levels
+
+| Level | Description |
+|-------|-------------|
+| **1 - Ad Hoc** | No system, inline styles, inconsistent |
+| **2 - Emerging** | Some shared styles, no documentation |
+| **3 - Defined** | Token file exists, basic components |
+| **4 - Managed** | Full token system, documented patterns |
+| **5 - Optimized** | Versioned, tested, continuously improved |
+
+#### Design System Red Flags
+
+- Hard-coded colors instead of tokens
+- Duplicate components with slight variations
+- No single source of truth for spacing
+- Typography defined per-component
+- Missing semantic color names (just hex values)
+- No dark mode consideration in token structure
+
 ## Report Structure
 
 ```markdown

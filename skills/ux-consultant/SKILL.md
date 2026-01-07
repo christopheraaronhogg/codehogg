@@ -90,6 +90,42 @@ Review responsive design:
 - Performance on mobile
 - Offline considerations
 
+### 6. Design System & Pattern Library (UX Perspective)
+
+Evaluate the UX aspects of the design system:
+
+| Aspect | Evaluation |
+|--------|------------|
+| **Pattern Consistency** | Same interactions behave the same everywhere? |
+| **Cognitive Load** | Are patterns familiar and learnable? |
+| **Feedback Patterns** | Consistent loading, success, error states? |
+| **Empty States** | Helpful, actionable empty state patterns? |
+| **Onboarding** | Progressive disclosure for new users? |
+| **Help Integration** | Contextual help patterns available? |
+
+#### UX Pattern Coherence Checklist
+
+| Pattern | Consistency Check |
+|---------|-------------------|
+| **Buttons** | Same action verbs, same placement logic |
+| **Forms** | Consistent validation, error messaging |
+| **Navigation** | Predictable location, clear wayfinding |
+| **Modals/Dialogs** | Consistent close behavior, focus trapping |
+| **Tables/Lists** | Consistent sorting, filtering, pagination |
+| **Search** | Same behavior across search contexts |
+| **Loading** | Unified skeleton, spinner, progress patterns |
+
+#### Design System UX Recommendations
+
+When evaluating or planning design systems, consider:
+
+1. **Interaction Standards** - Document expected behaviors, not just visuals
+2. **State Definitions** - Default, hover, focus, active, disabled, loading, error
+3. **Animation Principles** - When to animate, duration, easing standards
+4. **Feedback Timing** - Immediate vs. delayed feedback guidelines
+5. **Error Recovery** - Standard patterns for user error recovery
+6. **Accessibility by Default** - Components should be accessible out-of-box
+
 ## Report Structure
 
 ```markdown
