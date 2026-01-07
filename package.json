@@ -1,7 +1,7 @@
 {
   "name": "codehogg",
-  "version": "1.0.0",
-  "description": "18 expert consultant subagents for Claude Code. Comprehensive codebase audits, feature planning, and implementation guidance.",
+  "version": "2.0.0",
+  "description": "20 specialized agents with 19 domain skills for Claude Code. Comprehensive codebase audits, feature planning, and implementation guidance.",
   "author": "Christopher Hogg",
   "license": "MIT",
   "repository": {

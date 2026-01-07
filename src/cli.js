@@ -70,7 +70,7 @@ function countFiles(dir) {
     return count;
 }
 
-// Count directories (skills)
+// Count directories (skills/agents)
 function countDirs(dir) {
     if (!existsSync(dir)) return 0;
 
@@ -82,8 +82,10 @@ function countDirs(dir) {
 // Init command
 function init(isGlobal, force) {
     const targetDir = getTargetDir(isGlobal);
+    const agentsTarget = join(targetDir, 'agents');
     const skillsTarget = join(targetDir, 'skills');
     const commandsTarget = join(targetDir, 'commands');
+    const agentsSource = join(TEMPLATES_DIR, 'agents');
     const skillsSource = join(TEMPLATES_DIR, 'skills');
     const commandsSource = join(TEMPLATES_DIR, 'commands');
 
@@ -93,17 +95,18 @@ function init(isGlobal, force) {
     console.log(`  Installing to ${scope}\n`);
 
     // Check if templates exist
-    if (!existsSync(skillsSource) || !existsSync(commandsSource)) {
+    if (!existsSync(agentsSource) || !existsSync(skillsSource) || !existsSync(commandsSource)) {
         console.error('  Error: Templates not found. Package may be corrupted.');
         console.error('  Try reinstalling: npm install -g codehogg');
         process.exit(1);
     }
 
     // Check for existing installation
+    const hasAgents = existsSync(agentsTarget);
     const hasSkills = existsSync(skillsTarget);
     const hasCommands = existsSync(commandsTarget);
 
-    if ((hasSkills || hasCommands) && !force) {
+    if ((hasAgents || hasSkills || hasCommands) && !force) {
         console.log('  Existing installation detected.');
         console.log('  Use --force to overwrite, or use "codehogg update" instead.\n');
         process.exit(1);
@@ -113,6 +116,14 @@ function init(isGlobal, force) {
     if (!existsSync(targetDir)) {
         mkdirSync(targetDir, { recursive: true });
     }
+
+    // Copy agents
+    console.log('  Copying agents...');
+    if (hasAgents && force) {
+        rmSync(agentsTarget, { recursive: true, force: true });
+    }
+    const agentsCopied = copyDir(agentsSource, agentsTarget);
+    console.log(`    ${agentsCopied} agents`);
 
     // Copy skills
     console.log('  Copying skills...');
@@ -132,11 +143,13 @@ function init(isGlobal, force) {
     console.log(`    ${commandsCopied} commands`);
 
     console.log('\n  Installation complete!\n');
-    console.log('  Available commands:');
-    console.log('    /audit-full      - Run all 18 consultants');
-    console.log('    /audit-quick     - Run 7 key consultants');
-    console.log('    /plan-full       - Plan with all consultants');
-    console.log('    /plan-quick      - Plan with 7 key consultants');
+    console.log('  Architecture:');
+    console.log('    agents/   - Specialized workers (proactive, isolated context)');
+    console.log('    skills/   - Domain knowledge (auto-loaded when relevant)');
+    console.log('    commands/ - Slash commands (user-invoked orchestration)');
+    console.log('\n  Quick start:');
+    console.log('    /audit-quick     - Run 7 key consultant agents');
+    console.log('    /audit-full      - Run all 18 consultant agents');
     console.log('    /explore-concepts - Generate 3 design directions');
     console.log('\n  Run /help in Claude Code to see all commands.\n');
 }
@@ -161,6 +174,7 @@ function update(isGlobal) {
 // Uninstall command
 function uninstall(isGlobal) {
     const targetDir = getTargetDir(isGlobal);
+    const agentsTarget = join(targetDir, 'agents');
     const skillsTarget = join(targetDir, 'skills');
     const commandsTarget = join(targetDir, 'commands');
     const scope = isGlobal ? 'global' : 'project';
@@ -169,6 +183,12 @@ function uninstall(isGlobal) {
     console.log(`  Uninstalling from ${scope}...\n`);
 
     let removed = false;
+
+    if (existsSync(agentsTarget)) {
+        rmSync(agentsTarget, { recursive: true, force: true });
+        console.log('    Removed agents/');
+        removed = true;
+    }
 
     if (existsSync(skillsTarget)) {
         rmSync(skillsTarget, { recursive: true, force: true });
@@ -198,23 +218,25 @@ function status() {
     console.log(`\n  codehogg v${getVersion()}\n`);
 
     // Check local
+    const localAgents = countFiles(join(localDir, 'agents'));
     const localSkills = countDirs(join(localDir, 'skills'));
     const localCommands = countFiles(join(localDir, 'commands'));
 
     console.log('  Project (./.claude/):');
-    if (localSkills > 0 || localCommands > 0) {
-        console.log(`    ${localSkills} skills, ${localCommands} commands`);
+    if (localAgents > 0 || localSkills > 0 || localCommands > 0) {
+        console.log(`    ${localAgents} agents, ${localSkills} skills, ${localCommands} commands`);
     } else {
         console.log('    Not installed');
     }
 
     // Check global
+    const globalAgents = countFiles(join(globalDir, 'agents'));
     const globalSkills = countDirs(join(globalDir, 'skills'));
     const globalCommands = countFiles(join(globalDir, 'commands'));
 
     console.log(`\n  Global (~/.claude/):`);
-    if (globalSkills > 0 || globalCommands > 0) {
-        console.log(`    ${globalSkills} skills, ${globalCommands} commands`);
+    if (globalAgents > 0 || globalSkills > 0 || globalCommands > 0) {
+        console.log(`    ${globalAgents} agents, ${globalSkills} skills, ${globalCommands} commands`);
     } else {
         console.log('    Not installed');
     }
@@ -227,7 +249,7 @@ function showHelp() {
     console.log(`
   codehogg v${getVersion()}
 
-  18 expert consultant subagents for Claude Code.
+  20 specialized agents with 19 domain skills for Claude Code.
 
   Usage:
     codehogg <command> [options]
@@ -253,9 +275,14 @@ function showHelp() {
     npx codehogg update            # Update project to latest
     npx codehogg status            # Check what's installed
 
+  Architecture:
+    agents/   - Specialized workers (run in isolated context)
+    skills/   - Domain knowledge (auto-loaded when relevant)
+    commands/ - Orchestration (user-invoked slash commands)
+
   After installation, use these commands in Claude Code:
-    /audit-full       Run all 18 consultants
-    /audit-quick      Run 7 key consultants
+    /audit-full       Run all 18 consultant agents
+    /audit-quick      Run 7 key consultant agents
     /plan-full        Plan with all consultants
     /explore-concepts Generate 3 design directions
 `);

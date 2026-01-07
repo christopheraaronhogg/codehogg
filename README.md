@@ -1,8 +1,8 @@
 # codehogg
 
-**18 expert consultant subagents for Claude Code.**
+**20 specialized agents with 19 domain skills for Claude Code.**
 
-Comprehensive codebase audits, feature planning, and implementation guidance through specialized AI consultants working in parallel.
+Comprehensive codebase audits, feature planning, and implementation guidance through a three-tier architecture of agents, skills, and commands.
 
 ## Installation
 
@@ -12,7 +12,7 @@ Comprehensive codebase audits, feature planning, and implementation guidance thr
 npx codehogg init
 ```
 
-This installs skills and commands to your project's `.claude/` directory.
+This installs agents, skills, and commands to your project's `.claude/` directory.
 
 ### Global Installation
 
@@ -20,7 +20,7 @@ This installs skills and commands to your project's `.claude/` directory.
 npx codehogg init --global
 ```
 
-This installs to `~/.claude/` so commands are available across all projects.
+This installs to `~/.claude/` so everything is available across all projects.
 
 ### Keep Up to Date
 
@@ -32,47 +32,86 @@ npx codehogg update
 npx codehogg update --global
 ```
 
+## Architecture
+
+codehogg uses a three-tier system that maps to Claude Code's native constructs:
+
+```
+.claude/
+├── agents/    # Specialized workers (run in isolated context)
+├── skills/    # Domain knowledge (auto-loaded when relevant)
+└── commands/  # Orchestration (user-invoked slash commands)
+```
+
+### Agents (20)
+
+Specialized workers that run in their own context window. Each agent:
+- Has a focused persona and expertise
+- Uses a specific model (Opus for deep analysis, Sonnet for implementation)
+- Has restricted tool access appropriate to their role
+- References skills for domain knowledge
+- Can be proactively triggered by Claude when relevant
+
+### Skills (19)
+
+Domain knowledge that Claude loads automatically when your request matches the skill's description. Skills contain:
+- Evaluation frameworks and methodologies
+- Checklists and assessment criteria
+- Report templates and output formats
+- Best practices and red flags
+
+### Commands (53)
+
+Slash commands you invoke explicitly. Commands:
+- Orchestrate which agents to run
+- Define wave-based execution for parallel work
+- Handle output file management
+- Compile summaries from multiple agents
+
+## The Agents
+
+| Agent | Expertise | Model |
+|-------|-----------|-------|
+| architect-consultant | System design, modularity, patterns | Opus |
+| backend-consultant | API design, services, data access | Opus |
+| code-quality-consultant | Tech debt, maintainability | Opus |
+| compliance-consultant | GDPR, CCPA, privacy | Opus |
+| copy-consultant | Content, voice, AI slop detection | Opus |
+| cost-consultant | Cloud costs, FinOps | Opus |
+| database-consultant | Schema, queries, performance | Opus |
+| devops-consultant | CI/CD, infrastructure | Opus |
+| docs-consultant | Documentation quality | Opus |
+| observability-consultant | Logging, monitoring | Opus |
+| performance-consultant | Bottlenecks, optimization | Opus |
+| product-consultant | Requirements, scope | Opus |
+| qa-consultant | Testing strategy | Opus |
+| security-consultant | OWASP, vulnerabilities | Opus |
+| seo-consultant | Technical SEO | Opus |
+| stack-consultant | Framework best practices | Opus |
+| ui-design-consultant | Visual design, AI slop | Opus |
+| ux-consultant | Usability, accessibility | Opus |
+| explore-concepts | Creative direction generation | Opus |
+| implementer | Feature implementation | Sonnet |
+
 ## Commands
 
-After installation, these commands are available in Claude Code:
-
-### Audit Commands (Assessment Mode)
+### Audit Commands
 
 Run expert analysis on existing code:
 
 | Command | Description |
 |---------|-------------|
-| `/audit-full` | All 18 consultants in 4 waves |
-| `/audit-quick` | 7 key consultants (fastest) |
+| `/audit-full` | All 18 consultant agents in 4 waves |
+| `/audit-quick` | 7 key agents in 2 waves |
 | `/audit-architecture` | System structure evaluation |
 | `/audit-security` | OWASP vulnerabilities, auth |
 | `/audit-performance` | Bottlenecks, Core Web Vitals |
 | `/audit-database` | Schema, queries, indexes |
-| `/audit-api` | REST design, endpoints |
-| `/audit-ui` | Visual design assessment |
+| `/audit-ui` | Visual design, AI slop detection |
 | `/audit-ux` | Usability, accessibility |
-| `/audit-copy` | Content quality, voice |
-| `/audit-code` | Tech debt, maintainability |
-| `/audit-devops` | CI/CD, infrastructure |
-| `/audit-qa` | Testing strategy |
-| `/audit-docs` | Documentation coverage |
-| `/audit-cost` | Cloud costs, FinOps |
-| `/audit-compliance` | GDPR, CCPA, privacy |
-| `/audit-stack` | Framework best practices |
-| `/audit-seo` | Technical SEO |
-| `/audit-observability` | Logging, monitoring |
-| `/audit-requirements` | Product scope |
+| ... | (18 individual + 4 bundles) |
 
-#### Bundle Commands
-
-| Command | Consultants |
-|---------|-------------|
-| `/audit-backend` | API, Database, Stack, Security, Compliance |
-| `/audit-frontend` | UI, UX, Copy, Performance, SEO |
-| `/audit-ops` | DevOps, Cost, Docs, QA, Observability |
-| `/audit-quality` | Architecture, Code Quality, Requirements |
-
-### Plan Commands (Design Mode)
+### Plan Commands
 
 Plan new features before implementation:
 
@@ -81,28 +120,8 @@ Plan new features before implementation:
 | `/plan-full` | Full planning with all 18 consultants |
 | `/plan-quick` | Fast planning with 7 key consultants |
 | `/plan-architecture` | System design planning |
-| `/plan-api` | API contract design |
-| `/plan-database` | Schema design |
 | `/plan-security` | Security requirements |
-| `/plan-ui` | Visual design specs |
-| `/plan-ux` | User flow design |
-| ... | (mirrors all audit commands) |
-
-#### Bundle Commands
-
-| Command | Focus |
-|---------|-------|
-| `/plan-foundation` | Product spec, Architecture, Code standards |
-| `/plan-backend` | API, Database, Stack, Security, Compliance |
-| `/plan-frontend` | UI, UX, Copy, Performance, SEO |
-| `/plan-ops` | DevOps, Cost, Docs, QA, Observability |
-
-### Implementation Commands
-
-| Command | Description |
-|---------|-------------|
-| `/implement-solo` | Main agent implements from plan sequentially |
-| `/implement-team` | Parallel delegation for independent tasks |
+| ... | (mirrors audit commands) |
 
 ### Creative Commands
 
@@ -110,30 +129,39 @@ Plan new features before implementation:
 |---------|-------------|
 | `/explore-concepts` | Generate 3 distinct implementation directions |
 
-## The 18 Consultant Domains
+### Implementation Commands
 
-Each consultant is a specialized AI expert:
+| Command | Description |
+|---------|-------------|
+| `/implement-solo` | Main agent implements from plan |
+| `/implement-team` | Parallel delegation for independent tasks |
 
-| Consultant | Expertise |
-|------------|-----------|
-| **architect** | System design, modularity, patterns |
-| **backend** | API design, services, data access |
-| **database** | Schema, queries, performance |
-| **security** | OWASP, auth, vulnerabilities |
-| **compliance** | GDPR, CCPA, privacy |
-| **stack** | Framework best practices (live research) |
-| **devops** | CI/CD, infrastructure |
-| **cost** | Cloud costs, FinOps |
-| **docs** | Documentation quality |
-| **qa** | Testing strategy |
-| **observability** | Logging, monitoring |
-| **ui-design** | Visual design, aesthetics |
-| **ux** | Usability, accessibility |
-| **copy** | Content, voice, microcopy |
-| **performance** | Bottlenecks, optimization |
-| **seo** | Technical SEO |
-| **code-quality** | Tech debt, maintainability |
-| **product** | Requirements, scope |
+## How It Works
+
+### Proactive Agent Use
+
+With agents defined, Claude can proactively use them:
+
+> **You:** "I just added OAuth login"
+> **Claude:** "I notice you added authentication code. Let me have the security-consultant agent review it in a separate context."
+
+### Wave-Based Execution
+
+For full audits, agents run in waves to prevent context overflow:
+
+1. **Wave 1: Quality** (3 agents) - Architecture, Code Quality, Requirements
+2. **Wave 2: Backend** (5 agents) - API, Database, Stack, Security, Compliance
+3. **Wave 3: Ops** (5 agents) - DevOps, Cost, Docs, QA, Observability
+4. **Wave 4: Frontend** (5 agents) - UI, UX, Copy, Performance, SEO
+
+Each agent writes their full report to a file and returns only a brief status.
+
+### Context Isolation
+
+Each agent runs in its own context window, which means:
+- Main conversation stays focused on high-level objectives
+- Agents can do deep analysis without polluting your context
+- Failed agents don't affect others in the wave
 
 ## Output Structure
 
@@ -156,30 +184,9 @@ planning-docs/{feature-slug}/
 ├── 00-prd.md
 ├── 00-implementation-plan.md
 ├── 01-product-spec.md
-├── 02-architecture-design.md
 ├── ...
 └── 18-seo-requirements.md
 ```
-
-## How It Works
-
-### Wave-Based Execution
-
-To prevent context overflow, consultants run in waves:
-
-1. **Wave 1: Quality** (3 consultants) - Architecture, Code Quality, Requirements
-2. **Wave 2: Backend** (5 consultants) - API, Database, Stack, Security, Compliance
-3. **Wave 3: Ops** (5 consultants) - DevOps, Cost, Docs, QA, Observability
-4. **Wave 4: Frontend** (5 consultants) - UI, UX, Copy, Performance, SEO
-
-Each consultant writes their full report to a file and returns only a brief status, keeping context lean.
-
-### Parallel Subagents
-
-Within each wave, consultants run in parallel using Claude's Task tool. This provides:
-- Faster analysis (parallel execution)
-- Deeper insights (each consultant has full focus)
-- Structured output (consistent report format)
 
 ## Project Integration
 
@@ -193,7 +200,7 @@ Project-specific guidelines, voice/tone, conventions.
 
 Design tokens, colors, typography, component patterns.
 
-The consultants read these automatically when gathering context.
+Agents read these automatically when gathering context.
 
 ## CLI Reference
 
@@ -203,7 +210,6 @@ npx codehogg init
 
 # Install globally
 npx codehogg init --global
-npx codehogg init -g
 
 # Update to latest version
 npx codehogg update
@@ -216,49 +222,50 @@ npx codehogg status
 npx codehogg uninstall
 npx codehogg uninstall --global
 
-# Force reinstall (overwrite existing)
+# Force reinstall
 npx codehogg init --force
 
-# Show version
+# Show version/help
 npx codehogg version
-
-# Show help
 npx codehogg help
 ```
 
 ## Example Workflows
 
-### New Project Audit
+### Quick Health Check
 
 ```bash
 npx codehogg init
 ```
 Then in Claude Code:
 ```
-/audit-full
+/audit-quick
 ```
-Get a comprehensive 18-consultant analysis of your entire codebase.
+Get analysis from 7 key agents in about 5 minutes.
 
-### Security Review Before Deploy
+### Deep Security Review
 
 ```
 /audit-security
 ```
-Run the security consultant for OWASP analysis and vulnerability assessment.
+The security-consultant agent runs in isolated context with OWASP methodology.
 
 ### Plan a New Feature
 
 ```
 /plan-quick "user authentication with OAuth"
 ```
-Get planning documents from 7 consultants covering architecture, security, UX, and more.
+Get planning documents from 7 consultant agents.
 
 ### Generate UI Options
 
 ```
 /explore-concepts "admin dashboard for order analytics"
 ```
-Get 3 distinct implementation directions with evocative physical metaphors.
+Get 3 distinct directions with physical metaphors:
+- Industrial Command Center (dense, dark, monospace)
+- Editorial Magazine (whitespace, serif, storytelling)
+- Playful Mosaic (bento grid, animations, discovery)
 
 ## License
 
