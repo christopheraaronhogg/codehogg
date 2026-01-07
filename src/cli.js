@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
-import { existsSync, mkdirSync, readdirSync, statSync, copyFileSync, readFileSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, statSync, copyFileSync, readFileSync, writeFileSync, rmSync } from 'fs';
 import { homedir } from 'os';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -142,6 +142,18 @@ function init(isGlobal, force) {
     const commandsCopied = copyDir(commandsSource, commandsTarget);
     console.log(`    ${commandsCopied} commands`);
 
+    // Copy CODEHOGG.md (auto-update instructions for Claude)
+    const codehoggMdSource = join(TEMPLATES_DIR, 'CODEHOGG.md');
+    const codehoggMdTarget = join(targetDir, 'CODEHOGG.md');
+    if (existsSync(codehoggMdSource)) {
+        copyFileSync(codehoggMdSource, codehoggMdTarget);
+    }
+
+    // Write timestamp for auto-update tracking
+    const timestampFile = join(targetDir, '.codehogg-updated');
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    writeFileSync(timestampFile, today);
+
     console.log('\n  Installation complete!\n');
     console.log('  Architecture:');
     console.log('    agents/   - Specialized workers (proactive, isolated context)');
@@ -177,6 +189,8 @@ function uninstall(isGlobal) {
     const agentsTarget = join(targetDir, 'agents');
     const skillsTarget = join(targetDir, 'skills');
     const commandsTarget = join(targetDir, 'commands');
+    const codehoggMdTarget = join(targetDir, 'CODEHOGG.md');
+    const timestampFile = join(targetDir, '.codehogg-updated');
     const scope = isGlobal ? 'global' : 'project';
 
     console.log(`\n  codehogg v${getVersion()}`);
@@ -199,6 +213,16 @@ function uninstall(isGlobal) {
     if (existsSync(commandsTarget)) {
         rmSync(commandsTarget, { recursive: true, force: true });
         console.log('    Removed commands/');
+        removed = true;
+    }
+
+    // Clean up meta files
+    if (existsSync(codehoggMdTarget)) {
+        rmSync(codehoggMdTarget);
+        removed = true;
+    }
+    if (existsSync(timestampFile)) {
+        rmSync(timestampFile);
         removed = true;
     }
 
