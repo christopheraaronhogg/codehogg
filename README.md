@@ -6,16 +6,27 @@ A Claude Code plugin that brings enterprise-grade analysis to any project throug
 
 ## Installation
 
-### Option 1: Local Development
+### Option 1: Install from GitHub Marketplace (Recommended)
+```bash
+/plugin marketplace add github:christopheraaronhogg/codehogg
+```
+
+After adding the marketplace, install the plugin:
+```bash
+/plugin install codehogg
+```
+
+### Option 2: Direct Plugin Install
+```bash
+/plugin install codehogg@github:christopheraaronhogg/codehogg
+```
+
+### Option 3: Local Development
 ```bash
 claude --plugin-dir /path/to/codehogg
 ```
 
-### Option 2: Install from GitHub
-```bash
-# Coming soon - marketplace installation
-/plugin install github:christopheraaronhogg/codehogg
-```
+After installation, restart Claude Code to load the plugin.
 
 ## Quick Start
 
