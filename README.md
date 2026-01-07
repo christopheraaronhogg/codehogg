@@ -1,51 +1,40 @@
 # codehogg
 
-**18 expert consultant subagents for comprehensive codebase audits, feature planning, and implementation guidance.**
+**18 expert consultant subagents for Claude Code.**
 
-A Claude Code plugin that brings enterprise-grade analysis to any project through specialized AI consultants working in parallel.
+Comprehensive codebase audits, feature planning, and implementation guidance through specialized AI consultants working in parallel.
 
 ## Installation
 
-### Option 1: Install from GitHub Marketplace (Recommended)
+### Quick Start (Project)
+
 ```bash
-/plugin marketplace add github:christopheraaronhogg/codehogg
+npx codehogg init
 ```
 
-After adding the marketplace, install the plugin:
+This installs skills and commands to your project's `.claude/` directory.
+
+### Global Installation
+
 ```bash
-/plugin install codehogg
+npx codehogg init --global
 ```
 
-### Option 2: Direct Plugin Install
+This installs to `~/.claude/` so commands are available across all projects.
+
+### Keep Up to Date
+
 ```bash
-/plugin install codehogg@github:christopheraaronhogg/codehogg
+# Update project installation
+npx codehogg update
+
+# Update global installation
+npx codehogg update --global
 ```
 
-### Option 3: Local Development
-```bash
-claude --plugin-dir /path/to/codehogg
-```
+## Commands
 
-After installation, restart Claude Code to load the plugin.
-
-## Quick Start
-
-After installation, run a quick audit of your codebase:
-
-```
-/codehogg:audit-quick
-```
-
-This spawns 7 consultant subagents in parallel to analyze:
-- Architecture
-- Security
-- Performance
-- Code Quality
-- UI Design
-- UX
-- Copy/Content
-
-## Available Commands
+After installation, these commands are available in Claude Code:
 
 ### Audit Commands (Assessment Mode)
 
@@ -53,35 +42,35 @@ Run expert analysis on existing code:
 
 | Command | Description |
 |---------|-------------|
-| `/codehogg:audit-full` | All 18 consultants in 4 waves |
-| `/codehogg:audit-quick` | 7 key consultants (fastest) |
-| `/codehogg:audit-architecture` | System structure evaluation |
-| `/codehogg:audit-security` | OWASP vulnerabilities, auth |
-| `/codehogg:audit-performance` | Bottlenecks, Core Web Vitals |
-| `/codehogg:audit-database` | Schema, queries, indexes |
-| `/codehogg:audit-api` | REST design, endpoints |
-| `/codehogg:audit-ui` | Visual design assessment |
-| `/codehogg:audit-ux` | Usability, accessibility |
-| `/codehogg:audit-copy` | Content quality, voice |
-| `/codehogg:audit-code` | Tech debt, maintainability |
-| `/codehogg:audit-devops` | CI/CD, infrastructure |
-| `/codehogg:audit-qa` | Testing strategy |
-| `/codehogg:audit-docs` | Documentation coverage |
-| `/codehogg:audit-cost` | Cloud costs, FinOps |
-| `/codehogg:audit-compliance` | GDPR, CCPA, privacy |
-| `/codehogg:audit-stack` | Framework best practices |
-| `/codehogg:audit-seo` | Technical SEO |
-| `/codehogg:audit-observability` | Logging, monitoring |
-| `/codehogg:audit-requirements` | Product scope |
+| `/audit-full` | All 18 consultants in 4 waves |
+| `/audit-quick` | 7 key consultants (fastest) |
+| `/audit-architecture` | System structure evaluation |
+| `/audit-security` | OWASP vulnerabilities, auth |
+| `/audit-performance` | Bottlenecks, Core Web Vitals |
+| `/audit-database` | Schema, queries, indexes |
+| `/audit-api` | REST design, endpoints |
+| `/audit-ui` | Visual design assessment |
+| `/audit-ux` | Usability, accessibility |
+| `/audit-copy` | Content quality, voice |
+| `/audit-code` | Tech debt, maintainability |
+| `/audit-devops` | CI/CD, infrastructure |
+| `/audit-qa` | Testing strategy |
+| `/audit-docs` | Documentation coverage |
+| `/audit-cost` | Cloud costs, FinOps |
+| `/audit-compliance` | GDPR, CCPA, privacy |
+| `/audit-stack` | Framework best practices |
+| `/audit-seo` | Technical SEO |
+| `/audit-observability` | Logging, monitoring |
+| `/audit-requirements` | Product scope |
 
 #### Bundle Commands
 
 | Command | Consultants |
 |---------|-------------|
-| `/codehogg:audit-backend` | API, Database, Stack, Security, Compliance |
-| `/codehogg:audit-frontend` | UI, UX, Copy, Performance, SEO |
-| `/codehogg:audit-ops` | DevOps, Cost, Docs, QA, Observability |
-| `/codehogg:audit-quality` | Architecture, Code Quality, Requirements |
+| `/audit-backend` | API, Database, Stack, Security, Compliance |
+| `/audit-frontend` | UI, UX, Copy, Performance, SEO |
+| `/audit-ops` | DevOps, Cost, Docs, QA, Observability |
+| `/audit-quality` | Architecture, Code Quality, Requirements |
 
 ### Plan Commands (Design Mode)
 
@@ -89,37 +78,37 @@ Plan new features before implementation:
 
 | Command | Description |
 |---------|-------------|
-| `/codehogg:plan-full` | Full planning with all 18 consultants |
-| `/codehogg:plan-quick` | Fast planning with 7 key consultants |
-| `/codehogg:plan-architecture` | System design planning |
-| `/codehogg:plan-api` | API contract design |
-| `/codehogg:plan-database` | Schema design |
-| `/codehogg:plan-security` | Security requirements |
-| `/codehogg:plan-ui` | Visual design specs |
-| `/codehogg:plan-ux` | User flow design |
+| `/plan-full` | Full planning with all 18 consultants |
+| `/plan-quick` | Fast planning with 7 key consultants |
+| `/plan-architecture` | System design planning |
+| `/plan-api` | API contract design |
+| `/plan-database` | Schema design |
+| `/plan-security` | Security requirements |
+| `/plan-ui` | Visual design specs |
+| `/plan-ux` | User flow design |
 | ... | (mirrors all audit commands) |
 
 #### Bundle Commands
 
 | Command | Focus |
 |---------|-------|
-| `/codehogg:plan-foundation` | Product spec, Architecture, Code standards |
-| `/codehogg:plan-backend` | API, Database, Stack, Security, Compliance |
-| `/codehogg:plan-frontend` | UI, UX, Copy, Performance, SEO |
-| `/codehogg:plan-ops` | DevOps, Cost, Docs, QA, Observability |
+| `/plan-foundation` | Product spec, Architecture, Code standards |
+| `/plan-backend` | API, Database, Stack, Security, Compliance |
+| `/plan-frontend` | UI, UX, Copy, Performance, SEO |
+| `/plan-ops` | DevOps, Cost, Docs, QA, Observability |
 
 ### Implementation Commands
 
 | Command | Description |
 |---------|-------------|
-| `/codehogg:implement-solo` | Main agent implements from plan sequentially |
-| `/codehogg:implement-team` | Parallel delegation for independent tasks |
+| `/implement-solo` | Main agent implements from plan sequentially |
+| `/implement-team` | Parallel delegation for independent tasks |
 
 ### Creative Commands
 
 | Command | Description |
 |---------|-------------|
-| `/codehogg:explore-concepts` | Generate 3 distinct implementation directions |
+| `/explore-concepts` | Generate 3 distinct implementation directions |
 
 ## The 18 Consultant Domains
 
@@ -197,36 +186,77 @@ Within each wave, consultants run in parallel using Claude's Task tool. This pro
 For best results, your project should include:
 
 ### CLAUDE.md (recommended)
+
 Project-specific guidelines, voice/tone, conventions.
 
 ### DESIGN_SYSTEM.md (recommended)
+
 Design tokens, colors, typography, component patterns.
 
-### The plugin reads these automatically when gathering context.
+The consultants read these automatically when gathering context.
+
+## CLI Reference
+
+```bash
+# Install to current project
+npx codehogg init
+
+# Install globally
+npx codehogg init --global
+npx codehogg init -g
+
+# Update to latest version
+npx codehogg update
+npx codehogg update --global
+
+# Check installation status
+npx codehogg status
+
+# Uninstall
+npx codehogg uninstall
+npx codehogg uninstall --global
+
+# Force reinstall (overwrite existing)
+npx codehogg init --force
+
+# Show version
+npx codehogg version
+
+# Show help
+npx codehogg help
+```
 
 ## Example Workflows
 
 ### New Project Audit
+
+```bash
+npx codehogg init
 ```
-/codehogg:audit-full
+Then in Claude Code:
+```
+/audit-full
 ```
 Get a comprehensive 18-consultant analysis of your entire codebase.
 
 ### Security Review Before Deploy
+
 ```
-/codehogg:audit-security
+/audit-security
 ```
 Run the security consultant for OWASP analysis and vulnerability assessment.
 
 ### Plan a New Feature
+
 ```
-/codehogg:plan-quick "user authentication with OAuth"
+/plan-quick "user authentication with OAuth"
 ```
 Get planning documents from 7 consultants covering architecture, security, UX, and more.
 
 ### Generate UI Options
+
 ```
-/codehogg:explore-concepts "admin dashboard for order analytics"
+/explore-concepts "admin dashboard for order analytics"
 ```
 Get 3 distinct implementation directions with evocative physical metaphors.
 

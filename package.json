@@ -1,0 +1,39 @@
+{
+  "name": "codehogg",
+  "version": "1.0.0",
+  "description": "18 expert consultant subagents for Claude Code. Comprehensive codebase audits, feature planning, and implementation guidance.",
+  "author": "Christopher Hogg",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/christopheraaronhogg/codehogg.git"
+  },
+  "homepage": "https://github.com/christopheraaronhogg/codehogg#readme",
+  "bugs": {
+    "url": "https://github.com/christopheraaronhogg/codehogg/issues"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "audit",
+    "architecture",
+    "security",
+    "performance",
+    "code-quality",
+    "consultants",
+    "planning"
+  ],
+  "bin": {
+    "codehogg": "./bin/codehogg.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "templates"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "type": "module"
+}
