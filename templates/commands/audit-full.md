@@ -115,6 +115,31 @@ Read all 18 report files and create:
 - `00-executive-summary.md` - Combined findings
 - `00-priority-matrix.md` - All recommendations ranked
 
+### Step 7: Integration Phase (NEW)
+After the executive summary is compiled, launch the **audit-integrator** agent to:
+
+1. **Cross-reference findings** - Identify issues flagged by multiple consultants
+2. **Detect systemic patterns** - Find root causes across domains
+3. **Map dependencies** - Understand what must be fixed first
+4. **Create remediation roadmap** - Sequence fixes for maximum impact
+
+The integrator will:
+- Update `00-executive-summary.md` with cross-domain insights
+- Update `00-priority-matrix.md` with corroboration and dependencies
+- Create `00-remediation-roadmap.md` with phased action plan
+
+```
+audit-integrator → reads all 18 reports
+                 → updates 00-executive-summary.md
+                 → updates 00-priority-matrix.md
+                 → creates 00-remediation-roadmap.md
+```
+
+**Why Integration Matters:**
+- Issues flagged by 3+ consultants = systemic, not isolated
+- Dependencies determine fix order, not just severity
+- A sequenced roadmap prevents rework and maximizes impact
+
 ## Minimal Return Pattern
 
 **CRITICAL:** Each consultant must:
@@ -133,8 +158,10 @@ This prevents context overflow between waves.
 
 ```
 audit-reports/{timestamp}/
-├── 00-executive-summary.md       # Compiled after all waves
-├── 00-priority-matrix.md         # All findings ranked
+├── # Integration Outputs (Step 6-7)
+├── 00-executive-summary.md       # Combined findings + cross-domain insights
+├── 00-priority-matrix.md         # All findings ranked with corroboration
+├── 00-remediation-roadmap.md     # NEW: Phased action plan with dependencies
 │
 ├── # Wave 1: Quality Bundle (3)
 ├── 01-architecture-assessment.md
@@ -183,6 +210,11 @@ After all waves complete, compile `00-executive-summary.md`:
 6. **Quick Wins** (easy improvements)
 7. **Strategic Initiatives** (longer-term)
 
+**After Integration Phase, adds:**
+8. **Cross-Domain Insights** (corroboration matrix)
+9. **Systemic Patterns** (root causes across domains)
+10. **Recommended Remediation Approach** (phased plan)
+
 ## Priority Matrix Format
 
 The `00-priority-matrix.md` ranks ALL findings:
@@ -192,6 +224,17 @@ The `00-priority-matrix.md` ranks ALL findings:
 | P0 | Security | SQL injection in... | Low | Critical |
 | P0 | Performance | N+1 query in... | Medium | High |
 | P1 | Architecture | Circular dependency... | High | High |
+
+**After Integration Phase, adds columns:**
+
+| Priority | Domain | Issue | Effort | Impact | Corr | Blocks | Phase |
+|----------|--------|-------|--------|--------|------|--------|-------|
+| P0 | Security | SQL injection | Low | Critical | 3 | API fixes | 0 |
+| P0 | Database | Missing indexes | Medium | High | 2 | Perf work | 1 |
+
+- **Corr**: Number of consultants flagging this issue
+- **Blocks**: What other fixes depend on this
+- **Phase**: Recommended remediation phase (0-4)
 
 ## Alternative Commands
 

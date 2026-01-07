@@ -1,6 +1,6 @@
 # codehogg
 
-**28 specialized agents with 21 domain skills for Claude Code.**
+**29 specialized agents with 22 domain skills for Claude Code.**
 
 Comprehensive codebase audits, feature planning, UX persona testing, and implementation guidance through a three-tier architecture of agents, skills, and commands.
 
@@ -43,7 +43,7 @@ codehogg uses a three-tier system that maps to Claude Code's native constructs:
 └── commands/  # Orchestration (user-invoked slash commands)
 ```
 
-### Agents (28)
+### Agents (29)
 
 Specialized workers that run in their own context window. Each agent:
 - Has a focused persona and expertise
@@ -52,7 +52,7 @@ Specialized workers that run in their own context window. Each agent:
 - References skills for domain knowledge
 - Can be proactively triggered by Claude when relevant
 
-### Skills (21)
+### Skills (22)
 
 Domain knowledge that Claude loads automatically when your request matches the skill's description. Skills contain:
 - Evaluation frameworks and methodologies
@@ -105,11 +105,12 @@ Slash commands you invoke explicitly. Commands:
 | ux-persona-david | Accessibility user | Keyboard only, a11y |
 | ux-persona-patricia | Skeptical shopper | Desktop, trust verification |
 
-### Planning & Implementation Agents (3)
+### Planning & Implementation Agents (4)
 
 | Agent | Purpose | Model |
 |-------|---------|-------|
 | planning-orchestrator | Coordinates full planning workflow with interview, PRD, roundtable | Opus |
+| audit-integrator | Synthesizes 18 audit reports into cross-referenced remediation roadmap | Opus |
 | explore-concepts | Generate 3 distinct design directions | Opus |
 | implementer | Execute implementation from plans | Sonnet |
 
@@ -121,7 +122,7 @@ Run expert analysis on existing code:
 
 | Command | Description |
 |---------|-------------|
-| `/audit-full` | All 18 consultant agents in 4 waves |
+| `/audit-full` | All 18 consultants + integration phase with remediation roadmap |
 | `/audit-quick` | 7 key agents in 2 waves |
 | `/audit-architecture` | System structure evaluation |
 | `/audit-security` | OWASP vulnerabilities, auth |
@@ -296,6 +297,17 @@ For full audits, agents run in waves to prevent context overflow:
 
 Each agent writes their full report to a file and returns only a brief status.
 
+### Integration Phase
+
+After all 18 consultants complete, the **audit-integrator** agent synthesizes findings:
+
+1. **Cross-references findings** - Issues flagged by 3+ consultants get priority boost
+2. **Identifies systemic patterns** - "Technical debt concentrated in OrderService"
+3. **Maps dependencies** - "Fix input validation BEFORE addressing SQL injection"
+4. **Creates remediation roadmap** - Phased plan respecting dependencies
+
+This transforms 18 isolated reports into ONE coherent action plan.
+
 ### Context Isolation
 
 Each agent runs in its own context window, which means:
@@ -309,8 +321,9 @@ Each agent runs in its own context window, which means:
 
 ```
 audit-reports/{timestamp}/
-├── 00-executive-summary.md
-├── 00-priority-matrix.md
+├── 00-executive-summary.md      # Combined findings + cross-domain insights
+├── 00-priority-matrix.md        # All findings ranked with corroboration
+├── 00-remediation-roadmap.md    # Phased action plan with dependencies
 ├── 01-architecture-assessment.md
 ├── 02-code-quality-assessment.md
 ├── ...
