@@ -1,7 +1,7 @@
 {
   "name": "codehogg",
-  "version": "2.2.0",
-  "description": "27 specialized agents with 20 domain skills for Claude Code. Comprehensive codebase audits, feature planning, and implementation guidance.",
+  "version": "2.3.0",
+  "description": "28 specialized agents with 21 domain skills for Claude Code. Comprehensive codebase audits, feature planning, and implementation guidance.",
   "author": "Christopher Hogg",
   "license": "MIT",
   "repository": {

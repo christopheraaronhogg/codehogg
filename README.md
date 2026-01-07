@@ -1,6 +1,6 @@
 # codehogg
 
-**27 specialized agents with 20 domain skills for Claude Code.**
+**28 specialized agents with 21 domain skills for Claude Code.**
 
 Comprehensive codebase audits, feature planning, UX persona testing, and implementation guidance through a three-tier architecture of agents, skills, and commands.
 
@@ -43,7 +43,7 @@ codehogg uses a three-tier system that maps to Claude Code's native constructs:
 └── commands/  # Orchestration (user-invoked slash commands)
 ```
 
-### Agents (27)
+### Agents (28)
 
 Specialized workers that run in their own context window. Each agent:
 - Has a focused persona and expertise
@@ -52,7 +52,7 @@ Specialized workers that run in their own context window. Each agent:
 - References skills for domain knowledge
 - Can be proactively triggered by Claude when relevant
 
-### Skills (20)
+### Skills (21)
 
 Domain knowledge that Claude loads automatically when your request matches the skill's description. Skills contain:
 - Evaluation frameworks and methodologies
@@ -105,10 +105,11 @@ Slash commands you invoke explicitly. Commands:
 | ux-persona-david | Accessibility user | Keyboard only, a11y |
 | ux-persona-patricia | Skeptical shopper | Desktop, trust verification |
 
-### Creative & Implementation Agents (2)
+### Planning & Implementation Agents (3)
 
 | Agent | Purpose | Model |
 |-------|---------|-------|
+| planning-orchestrator | Coordinates full planning workflow with interview, PRD, roundtable | Opus |
 | explore-concepts | Generate 3 distinct design directions | Opus |
 | implementer | Execute implementation from plans | Sonnet |
 
@@ -132,15 +133,16 @@ Run expert analysis on existing code:
 
 ### Plan Commands
 
-Plan new features before implementation:
+Plan new features with interview → PRD → roundtable → detailed plans:
 
 | Command | Description |
 |---------|-------------|
-| `/plan-full` | Full planning with all 18 consultants |
-| `/plan-quick` | Fast planning with 7 key consultants |
-| `/plan-architecture` | System design planning |
-| `/plan-security` | Security requirements |
-| ... | (mirrors audit commands) |
+| `/plan-full` | Full 5-phase planning with interview and 9-expert roundtable |
+| `/plan-full "feature"` | Skip interview, proceed with provided details |
+| `/plan-quick` | Streamlined planning with 7 key consultants |
+| `/plan-architecture` | Architecture-focused planning |
+| `/plan-security` | Security-focused planning |
+| ... | (domain-specific planning commands) |
 
 ### UX Persona Testing Commands
 
@@ -225,6 +227,55 @@ Instead of traditional automated tests, codehogg spawns intelligent agents that:
 /test-ux-a11y --url http://localhost:3000
 ```
 
+## Feature Planning
+
+A professional-grade planning workflow modeled after real software development firms.
+
+### The 5-Phase Workflow
+
+```
+INTERVIEW → PRD DRAFT → ROUNDTABLE → DETAIL → INTEGRATE
+```
+
+1. **Interview** — Discover what you want to build (optional if you provide details)
+2. **PRD Draft** — Product consultant creates initial requirements
+3. **Roundtable** — 9 experts sequentially enrich the PRD
+4. **Detail** — Parallel deep planning for each domain
+5. **Integrate** — Combine into sequenced implementation plan
+
+### Running a Full Plan
+
+```bash
+# Interview mode - asks what you want to build
+/plan-full
+
+# Skip interview - proceed with details
+/plan-full "OAuth login with Google and GitHub for our Laravel app"
+```
+
+### The Expert Roundtable
+
+Each expert reviews the PRD and adds their considerations:
+
+| Expert | Adds |
+|--------|------|
+| Architect | System structure, patterns |
+| Security | Threat model, auth requirements |
+| Database | Data model, schema design |
+| Backend | API design, services |
+| UX | User flows, states, accessibility |
+| DevOps | Infrastructure, deployment |
+| Performance | Load targets, optimization |
+| QA | Test strategy, acceptance criteria |
+
+### Flexible Interview
+
+All questions are **optional**. Say "skip" or "idk" and the orchestrator:
+- Makes reasonable assumptions
+- Uses context from CLAUDE.md and codebase
+- Notes assumptions for your confirmation
+- Keeps moving forward
+
 ## How It Works
 
 ### Proactive Agent Use
@@ -270,11 +321,17 @@ audit-reports/{timestamp}/
 
 ```
 planning-docs/{feature-slug}/
-├── 00-prd.md
-├── 00-implementation-plan.md
-├── 01-product-spec.md
-├── ...
-└── 18-seo-requirements.md
+├── 00-interview-notes.md       # Discovery conversation (if happened)
+├── 01-prd-draft.md             # Initial PRD
+├── 02-prd-enriched.md          # PRD after expert roundtable
+├── plans/
+│   ├── architecture.md
+│   ├── security.md
+│   ├── database.md
+│   ├── backend.md
+│   ├── frontend.md
+│   └── ...
+└── 99-implementation-plan.md   # Final sequenced plan
 ```
 
 ### UX Persona Reports
@@ -354,9 +411,14 @@ The security-consultant agent runs in isolated context with OWASP methodology.
 ### Plan a New Feature
 
 ```
+/plan-full "user authentication with OAuth"
+```
+Full 5-phase planning: interview (skipped with input), PRD, expert roundtable, detailed plans, integrated implementation plan.
+
+Or for faster planning:
+```
 /plan-quick "user authentication with OAuth"
 ```
-Get planning documents from 7 consultant agents.
 
 ### Generate UI Options
 
