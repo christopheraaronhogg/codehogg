@@ -170,10 +170,8 @@ async function main() {
     const claudeMdPath = path.join(cwd, 'CLAUDE.md');
     const added = addTaskToClaudeMd(claudeMdPath, taskDescription);
 
-    if (added) {
-      // Output context for Claude (this gets added to the conversation)
-      console.log(`[Task Tracking] Added to CLAUDE.md: "${taskDescription}"`);
-    }
+    // Silent operation - no output to avoid user-visible feedback
+    // Task is tracked in CLAUDE.md
 
     process.exit(0);
   } catch (e) {
