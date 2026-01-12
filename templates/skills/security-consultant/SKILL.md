@@ -1,6 +1,7 @@
 ---
 name: security-consultant
 description: Provides expert security analysis, vulnerability assessment, and threat modeling for software projects. Use this skill when the user needs a security audit, penetration testing guidance, threat model review, compliance assessment, secure coding evaluation, or attack surface analysis. Triggers include requests for security review, vulnerability assessment, OWASP analysis, threat modeling, compliance check (SOC2, HIPAA, PCI-DSS, GDPR), authentication/authorization audit, or when asked to analyze a codebase for security issues. Produces detailed consultant-style security reports with findings and prioritized remediation recommendations — does NOT write implementation code.
+aliases: [audit-security, plan-security]
 ---
 
 # Security Consultant
@@ -218,3 +219,134 @@ Save to: `planning-docs/{feature-slug}/07-security-requirements.md`
 3. **Actionable** - Each finding should have clear remediation steps
 4. **Prioritized** - Help the team focus on what matters most
 5. **Professional** - Executive-ready language and formatting
+
+---
+
+## Slash Command Invocation
+
+This skill can be invoked via:
+- `/security-consultant` - Full skill with methodology
+- `/audit-security` - Quick assessment mode
+- `/plan-security` - Design/planning mode
+
+### Assessment Mode (/audit-security)
+
+---name: audit-securitydescription: 🔐 Security Review - Run the security-consultant agent for OWASP analysis and vulnerability assessment
+---
+
+# Security Assessment
+
+Run the **security-consultant** agent for comprehensive security evaluation.
+
+## Target (optional)
+$ARGUMENTS
+
+## Output
+
+**Targeted Reviews:** `./audit-reports/{target-slug}/security-assessment.md`
+**Full Codebase:** `./audit-reports/security-assessment.md`
+
+## Batch Mode
+
+When invoked as part of `/audit-full` or `/audit-backend`, return only a brief status:
+
+```
+✓ Security Assessment Complete
+  Saved to: {filepath}
+  Critical: X | High: Y | Medium: Z
+  Key finding: {one-line summary}
+```
+
+### Design Mode (/plan-security)
+
+---name: plan-securitydescription: 🔐 ULTRATHINK Security Design - Threat model, auth, data protection
+---
+
+# Security Design
+
+Invoke the **security-consultant** in Design Mode for security requirements planning.
+
+## Target Feature
+
+$ARGUMENTS
+
+## Output Location
+
+Save to: `planning-docs/{feature-slug}/07-security-requirements.md`
+
+## Design Considerations
+
+### Threat Model (STRIDE)
+- **Spoofing** - Identity verification requirements
+- **Tampering** - Data integrity protections needed
+- **Repudiation** - Audit logging requirements
+- **Information Disclosure** - Sensitive data handling
+- **Denial of Service** - Rate limiting, resource protection
+- **Elevation of Privilege** - Permission boundaries
+
+### Authentication Design
+- Auth mechanism selection (session, JWT, OAuth)
+- Password requirements (if applicable)
+- MFA considerations
+- Session timeout policies
+- Remember me functionality
+- Account recovery flow
+
+### Authorization Design
+- Role-based access control (RBAC)
+- Permission model
+- Resource-level permissions
+- API authorization
+- UI element visibility rules
+
+### Data Protection
+- Data classification (public, internal, confidential, restricted)
+- Encryption at rest requirements
+- Encryption in transit
+- PII handling
+- Data masking/redaction
+- Secure deletion requirements
+
+### Input Validation
+- User input sanitization rules
+- File upload security
+- API input validation
+- SQL injection prevention
+- XSS prevention
+- CSRF protection
+
+### Audit Requirements
+- Security events to log
+- Audit trail structure
+- Log retention period
+- Compliance requirements
+- Alerting triggers
+
+## Design Deliverables
+
+1. **Threat Model** - STRIDE analysis for the feature
+2. **Authentication** - Auth requirements, session handling
+3. **Authorization** - Permission model, access control
+4. **Data Protection** - Encryption, sanitization needs
+5. **Input Validation** - Validation rules, sanitization
+6. **Audit Requirements** - What to log, compliance needs
+
+## Output Format
+
+Deliver security design document with:
+- **Threat Model Matrix** (threat, risk, mitigation)
+- **Authentication Flow Diagram**
+- **Permission Matrix** (role × resource × action)
+- **Data Classification Table**
+- **Validation Rule Inventory**
+- **Security Checklist** (implementation verification)
+
+**Be thorough about security requirements. Reference OWASP guidelines where applicable.**
+
+## Minimal Return Pattern
+
+Write full design to file, return only:
+```
+✓ Design complete. Saved to {filepath}
+  Key decisions: {1-2 sentence summary}
+```

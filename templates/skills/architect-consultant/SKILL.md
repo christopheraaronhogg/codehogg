@@ -1,6 +1,7 @@
 ---
 name: architect-consultant
 description: Provides expert architectural analysis and strategic recommendations for software projects. Use this skill when the user needs a comprehensive architectural review, system design evaluation, technology stack assessment, scalability analysis, or technical vision guidance. Triggers include requests for architecture review, system design audit, tech stack evaluation, scalability assessment, modernization strategy, or when asked to analyze a codebase from an architectural perspective. Produces detailed consultant-style reports with findings and prioritized recommendations — does NOT write implementation code.
+aliases: [audit-architecture, plan-architecture]
 ---
 
 # Architect Consultant
@@ -270,3 +271,125 @@ Save to: `planning-docs/{feature-slug}/02-architecture-design.md`
 4. **Trade-off aware** - Acknowledge pros/cons of recommendations
 5. **Business aligned** - Connect technical decisions to business value
 6. **Pragmatic** - Recommend achievable improvements
+
+---
+
+## Slash Command Invocation
+
+This skill can be invoked via:
+- `/architect-consultant` - Full skill with methodology
+- `/audit-architecture` - Quick assessment mode
+- `/plan-architecture` - Design/planning mode
+
+### Assessment Mode (/audit-architecture)
+
+---name: audit-architecturedescription: 🏗️ Architecture Review - Run the architect-consultant agent for system design evaluation
+---
+
+# Architecture Assessment
+
+Run the **architect-consultant** agent for comprehensive architectural analysis.
+
+## Target (optional)
+$ARGUMENTS
+
+## Output
+
+**Targeted Reviews:** `./audit-reports/{target-slug}/architecture-assessment.md`
+**Full Codebase:** `./audit-reports/architecture-assessment.md`
+
+## Batch Mode
+
+When invoked as part of `/audit-full` or `/audit-quality`, return only a brief status:
+
+```
+✓ Architecture Assessment Complete
+  Saved to: {filepath}
+  Critical: X | High: Y | Medium: Z
+  Key finding: {one-line summary}
+```
+
+### Design Mode (/plan-architecture)
+
+---name: plan-architecturedescription: 🏛️ ULTRATHINK Architecture Design - System structure, components, integration
+---
+
+# Architecture Design
+
+Invoke the **architect-consultant** in Design Mode for system architecture planning.
+
+## Target Feature
+
+$ARGUMENTS
+
+## Output Location
+
+Save to: `planning-docs/{feature-slug}/02-architecture-design.md`
+
+## Design Considerations
+
+### System Structure
+- Overall architecture pattern (MVC, layered, hexagonal, etc.)
+- Module organization and boundaries
+- Component responsibilities
+- Service layer design
+- Where this feature fits in the existing architecture
+
+### Component Design
+- New components/classes needed
+- Existing components to extend or modify
+- Shared vs. feature-specific code
+- Interface definitions
+
+### Dependency Planning
+- External dependencies needed
+- Internal module dependencies
+- Circular dependency prevention
+- Dependency injection approach
+
+### Integration Points
+- How feature connects to existing system
+- API boundaries
+- Event/message contracts
+- Database access patterns
+
+### Scalability Considerations
+- Horizontal scaling readiness
+- State management approach
+- Caching strategy
+- Async processing needs
+
+### Code Organization
+- Directory structure for new code
+- Naming conventions to follow
+- File organization patterns
+- Configuration approach
+
+## Design Deliverables
+
+1. **System Design** - Component diagram, responsibilities
+2. **Integration Points** - How feature connects to existing system
+3. **Data Flow** - Request/response paths
+4. **Dependencies** - What this feature needs/provides
+5. **Technical Constraints** - Performance, security, scalability
+6. **Trade-offs** - Decisions made and alternatives considered
+
+## Output Format
+
+Deliver architecture design document with:
+- **Architecture Diagram** (ASCII or description)
+- **Component Responsibilities Matrix**
+- **Integration Contract Definitions**
+- **Dependency Graph**
+- **Implementation Constraints**
+- **Risk Assessment**
+
+**Be specific about architectural decisions. Reference exact patterns and file locations.**
+
+## Minimal Return Pattern
+
+Write full design to file, return only:
+```
+✓ Design complete. Saved to {filepath}
+  Key decisions: {1-2 sentence summary}
+```

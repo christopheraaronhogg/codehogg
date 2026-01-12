@@ -4,7 +4,7 @@
 
 ### Making Changes
 
-1. **Edit files** in `templates/` (agents, skills, commands) or `src/`
+1. **Edit files** in `templates/` (agents, skills) or `src/`
 2. **Test locally** by running `node bin/codehogg.js` commands
 3. **Commit and push** to GitHub
 
@@ -76,9 +76,9 @@ codehogg/
 ├── src/
 │   └── cli.js           # CLI implementation
 ├── templates/
-│   ├── agents/          # Agent definitions (27)
-│   ├── skills/          # Domain knowledge (20)
-│   └── commands/        # Slash commands (57)
+│   ├── agents/          # Agent definitions (29)
+│   ├── skills/          # Unified skills (43)
+│   └── hooks/           # Task tracking hooks (2)
 ├── package.json
 ├── README.md
 └── CONTRIBUTING.md      # You are here
@@ -121,6 +121,12 @@ Write findings to: `audit-reports/{filename}.md`
 Create `templates/skills/{name}/SKILL.md`:
 
 ```markdown
+---
+name: skill-name
+description: Brief description for /help listing
+aliases: [alias1, alias2]  # Optional alternative command names
+---
+
 # Skill Name
 
 ## Overview
@@ -131,27 +137,19 @@ Create `templates/skills/{name}/SKILL.md`:
 
 ## Report Template
 [Output format]
+
+## Slash Command Invocation
+
+This skill can be invoked via:
+- `/skill-name` - Full skill with methodology
+- `/alias1` - Alternative invocation
+
+### Mode Details
+
+[Any mode-specific instructions]
 ```
 
-### New Command
-
-Create `templates/commands/{name}.md`:
-
-```markdown
----
-description: 🔧 Command Name - Brief description for /help listing
----
-
-# Command Title
-
-Run the **agent-name** agent for [purpose].
-
-## Usage
-$ARGUMENTS
-
-## Output
-`./audit-reports/{output-path}.md`
-```
+**Note:** As of v3.0.0, commands and skills are unified. Each skill can have aliases that become separate slash commands.
 
 ## Questions?
 

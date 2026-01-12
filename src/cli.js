@@ -1,12 +1,36 @@
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
 import { existsSync, mkdirSync, readdirSync, statSync, copyFileSync, readFileSync, writeFileSync, rmSync, accessSync, constants } from 'fs';
-import { homedir } from 'os';
+import { homedir, platform } from 'os';
+import { createInterface } from 'readline';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PACKAGE_ROOT = resolve(__dirname, '..');
 const TEMPLATES_DIR = join(PACKAGE_ROOT, 'templates');
+
+// ANSI colors (works on Windows 10+, macOS, Linux)
+const c = {
+    reset: '\x1b[0m',
+    bold: '\x1b[1m',
+    dim: '\x1b[2m',
+    green: '\x1b[32m',
+    yellow: '\x1b[33m',
+    blue: '\x1b[34m',
+    magenta: '\x1b[35m',
+    cyan: '\x1b[36m',
+    red: '\x1b[31m',
+};
+
+// Symbols (use ASCII fallback on Windows if needed)
+const isWindows = platform() === 'win32';
+const sym = {
+    check: isWindows ? '[OK]' : '✓',
+    arrow: isWindows ? '>' : '❯',
+    bullet: isWindows ? '*' : '•',
+    warn: isWindows ? '[!]' : '⚠',
+    info: isWindows ? '[i]' : 'ℹ',
+};
 
 // Get version from package.json
 function getVersion() {
@@ -14,80 +38,49 @@ function getVersion() {
     return pkg.version;
 }
 
-// Validate a directory path is accessible
-function validatePath(dirPath, description) {
-    try {
-        // Check if parent directory exists and is writable
-        const parentDir = dirname(dirPath);
-        if (!existsSync(parentDir)) {
-            return {
-                valid: false,
-                error: `Parent directory does not exist: ${parentDir}`
-            };
-        }
-
-        // Check if we can access the parent
-        accessSync(parentDir, constants.W_OK);
-        return { valid: true };
-    } catch (err) {
-        return {
-            valid: false,
-            error: `Cannot access ${description}: ${err.message}`
-        };
-    }
-}
-
-// Get safe home directory with fallback
-function getSafeHomedir() {
+// Get safe home directory
+function getHomedir() {
     try {
         const home = homedir();
-        if (!home || home === '') {
-            return null;
-        }
-        // Normalize path separators for Windows
-        return home.replace(/\\/g, '/');
-    } catch (err) {
+        if (!home || home === '') return null;
+        return home;
+    } catch {
         return null;
     }
 }
 
 // Get the target .claude directory
-function getTargetDir(isGlobal, customPath = null) {
-    // Custom path takes precedence
+function getTargetDir(scope, customPath = null) {
     if (customPath) {
-        return resolve(customPath);
+        let p = customPath;
+        if (p.startsWith('~')) {
+            const home = getHomedir();
+            if (home) p = p.replace('~', home);
+        }
+        return resolve(p);
     }
 
-    if (isGlobal) {
-        // Global: ~/.claude/ (user's home directory)
-        const home = getSafeHomedir();
-        if (!home) {
-            return null;
-        }
+    if (scope === 'global') {
+        const home = getHomedir();
+        if (!home) return null;
         return join(home, '.claude');
     }
-    // Local: ./.claude/ (current working directory)
+
     return join(process.cwd(), '.claude');
 }
 
-// Show helpful error for path issues
-function showPathError(isGlobal) {
-    console.error('\n  Error: Cannot determine installation directory.\n');
-
-    if (isGlobal) {
-        console.error('  This usually means your npm/node configuration has issues.');
-        console.error('  Common fixes:\n');
-        console.error('  1. Reset npm prefix (if you see "ENOENT: no such file or directory"):');
-        console.error('     npm config delete prefix\n');
-        console.error('  2. Use a custom path instead:');
-        console.error('     npx codehogg init --path ~/.claude\n');
-        console.error('  3. Or install to current project instead:');
-        console.error('     npx codehogg init\n');
-    } else {
-        console.error('  Cannot access current directory.');
-        console.error('  Try specifying a path: npx codehogg init --path /path/to/.claude\n');
+// Validate directory is accessible
+function validatePath(dirPath) {
+    try {
+        const parentDir = dirname(dirPath);
+        if (!existsSync(parentDir)) {
+            return { valid: false, error: `Parent directory does not exist: ${parentDir}` };
+        }
+        accessSync(parentDir, constants.W_OK);
+        return { valid: true };
+    } catch (err) {
+        return { valid: false, error: `Cannot access directory: ${err.message}` };
     }
-    process.exit(1);
 }
 
 // Recursively copy directory
@@ -115,267 +108,440 @@ function copyDir(src, dest) {
     return copied;
 }
 
-// Count files in directory recursively
+// Count files in directory
 function countFiles(dir) {
     if (!existsSync(dir)) return 0;
-
     let count = 0;
-    const entries = readdirSync(dir);
-
-    for (const entry of entries) {
-        const path = join(dir, entry);
-        const stat = statSync(path);
-
-        if (stat.isDirectory()) {
-            count += countFiles(path);
-        } else {
-            count++;
-        }
+    for (const entry of readdirSync(dir)) {
+        const p = join(dir, entry);
+        const stat = statSync(p);
+        count += stat.isDirectory() ? countFiles(p) : 1;
     }
-
     return count;
 }
 
-// Count directories (skills/agents)
+// Count directories
 function countDirs(dir) {
     if (!existsSync(dir)) return 0;
-
-    return readdirSync(dir).filter(entry => {
-        return statSync(join(dir, entry)).isDirectory();
-    }).length;
+    return readdirSync(dir).filter(e => statSync(join(dir, e)).isDirectory()).length;
 }
 
-// Init command
-function init(isGlobal, force, customPath = null) {
-    const targetDir = getTargetDir(isGlobal, customPath);
+// Prompt helper using readline
+function prompt(question) {
+    return new Promise((resolve) => {
+        const rl = createInterface({
+            input: process.stdin,
+            output: process.stdout
+        });
+        rl.question(question, (answer) => {
+            rl.close();
+            resolve(answer.trim());
+        });
+    });
+}
 
-    // Validate target directory
+// Interactive menu selection
+async function select(question, options) {
+    console.log(`\n  ${c.bold}${question}${c.reset}\n`);
+    options.forEach((opt, i) => {
+        console.log(`    ${c.cyan}${i + 1}${c.reset}) ${opt.label}`);
+        if (opt.desc) console.log(`       ${c.dim}${opt.desc}${c.reset}`);
+    });
+
+    const answer = await prompt(`\n  Enter choice (1-${options.length}): `);
+    const idx = parseInt(answer, 10) - 1;
+
+    if (idx >= 0 && idx < options.length) {
+        return options[idx].value;
+    }
+    // Default to first option
+    return options[0].value;
+}
+
+// Yes/No prompt
+async function confirm(question, defaultYes = true) {
+    const hint = defaultYes ? 'Y/n' : 'y/N';
+    const answer = await prompt(`  ${question} (${hint}): `);
+
+    if (answer === '') return defaultYes;
+    return answer.toLowerCase().startsWith('y');
+}
+
+// Get hooks configuration object
+function getHooksConfig(scope) {
+    // Use relative paths for project scope, but need absolute for global
+    // Actually, relative paths work from cwd, so they work for both!
+    return {
+        UserPromptSubmit: [{
+            hooks: [{
+                type: "command",
+                command: "node .claude/hooks/on-prompt-submit.cjs",
+                timeout: 5,
+                once: true
+            }]
+        }],
+        Stop: [{
+            hooks: [{
+                type: "command",
+                command: "node .claude/hooks/on-stop.cjs",
+                timeout: 10
+            }]
+        }]
+    };
+}
+
+// Merge hooks into existing settings.json
+function configureHooks(settingsPath, scope) {
+    let settings = {};
+
+    if (existsSync(settingsPath)) {
+        try {
+            settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+        } catch {
+            // If parse fails, start fresh
+            settings = {};
+        }
+    }
+
+    // Merge hooks config
+    settings.hooks = getHooksConfig(scope);
+
+    // Write back
+    const dir = dirname(settingsPath);
+    if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+    }
+
+    writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+    return true;
+}
+
+// Remove hooks from settings.json
+function removeHooksConfig(settingsPath) {
+    if (!existsSync(settingsPath)) return false;
+
+    try {
+        const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+        if (settings.hooks) {
+            delete settings.hooks;
+            writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+            return true;
+        }
+    } catch {
+        // Ignore errors
+    }
+    return false;
+}
+
+// Print banner
+function printBanner() {
+    console.log(`
+  ${c.bold}${c.magenta}codehogg${c.reset} ${c.dim}v${getVersion()}${c.reset}
+  ${c.dim}29 agents ${sym.bullet} 43 skills for Claude Code${c.reset}
+`);
+}
+
+// Interactive install
+async function interactiveInit() {
+    printBanner();
+
+    console.log(`  ${c.cyan}Welcome!${c.reset} Let's set up codehogg for Claude Code.\n`);
+
+    // Step 1: Choose scope
+    const scope = await select('Where would you like to install?', [
+        {
+            value: 'project',
+            label: 'Current project (./.claude/)',
+            desc: 'Best for project-specific customization'
+        },
+        {
+            value: 'global',
+            label: 'Global (~/.claude/)',
+            desc: 'Available in all projects'
+        }
+    ]);
+
+    const targetDir = getTargetDir(scope);
+
     if (!targetDir) {
-        showPathError(isGlobal);
-        return;
+        console.log(`\n  ${c.red}Error:${c.reset} Cannot determine ${scope} directory.`);
+        if (scope === 'global') {
+            console.log(`  ${c.dim}Try: npx codehogg init --path ~/.claude${c.reset}\n`);
+        }
+        process.exit(1);
     }
 
-    const validation = validatePath(targetDir, isGlobal ? 'home directory' : 'current directory');
+    const validation = validatePath(targetDir);
     if (!validation.valid) {
-        console.error(`\n  Error: ${validation.error}\n`);
-        showPathError(isGlobal);
-        return;
-    }
-
-    const agentsTarget = join(targetDir, 'agents');
-    const skillsTarget = join(targetDir, 'skills');
-    const commandsTarget = join(targetDir, 'commands');
-    const agentsSource = join(TEMPLATES_DIR, 'agents');
-    const skillsSource = join(TEMPLATES_DIR, 'skills');
-    const commandsSource = join(TEMPLATES_DIR, 'commands');
-
-    const scope = customPath ? `custom (${targetDir})` : (isGlobal ? 'global (~/.claude/)' : 'project (./.claude/)');
-
-    console.log(`\n  codehogg v${getVersion()}`);
-    console.log(`  Installing to ${scope}\n`);
-
-    // Check if templates exist
-    if (!existsSync(agentsSource) || !existsSync(skillsSource) || !existsSync(commandsSource)) {
-        console.error('  Error: Templates not found. Package may be corrupted.');
-        console.error('  Try reinstalling: npm install -g codehogg');
+        console.log(`\n  ${c.red}Error:${c.reset} ${validation.error}\n`);
         process.exit(1);
     }
 
     // Check for existing installation
-    const hasAgents = existsSync(agentsTarget);
-    const hasSkills = existsSync(skillsTarget);
-    const hasCommands = existsSync(commandsTarget);
+    const hasExisting = existsSync(join(targetDir, 'agents')) ||
+                        existsSync(join(targetDir, 'skills'));
 
-    if ((hasAgents || hasSkills || hasCommands) && !force) {
-        console.log('  Existing installation detected.');
-        console.log('  Use --force to overwrite, or use "codehogg update" instead.\n');
-        process.exit(1);
+    if (hasExisting) {
+        const overwrite = await confirm(`${c.yellow}${sym.warn}${c.reset} Existing installation found. Overwrite?`, false);
+        if (!overwrite) {
+            console.log(`\n  ${c.dim}Use 'codehogg update' to update existing installation.${c.reset}\n`);
+            process.exit(0);
+        }
     }
+
+    // Step 2: Hooks
+    console.log(`\n  ${c.bold}Task Tracking Hooks${c.reset}`);
+    console.log(`  ${c.dim}Automatically track tasks in CLAUDE.md:${c.reset}`);
+    console.log(`  ${c.dim}  ${sym.bullet} on-prompt-submit: Adds tasks when you give commands${c.reset}`);
+    console.log(`  ${c.dim}  ${sym.bullet} on-stop: Updates task status when Claude finishes${c.reset}\n`);
+
+    const enableHooks = await confirm('Enable task tracking hooks?', true);
+
+    // Step 3: Install
+    console.log(`\n  ${c.bold}Installing...${c.reset}\n`);
+
+    await doInstall(targetDir, scope, enableHooks, true);
+
+    // Step 4: Success
+    console.log(`\n  ${c.green}${c.bold}Installation complete!${c.reset}\n`);
+
+    console.log(`  ${c.bold}Quick start:${c.reset}`);
+    console.log(`    ${c.cyan}/audit-quick${c.reset}      - Run 7 key consultant agents`);
+    console.log(`    ${c.cyan}/audit-full${c.reset}       - Run all 18 consultant agents`);
+    console.log(`    ${c.cyan}/plan-full${c.reset}        - Full 5-phase planning workflow`);
+    console.log(`    ${c.cyan}/explore-concepts${c.reset} - Generate 3 design directions`);
+    console.log(`\n  ${c.dim}Run /help in Claude Code to see all commands.${c.reset}\n`);
+}
+
+// Do the actual installation
+async function doInstall(targetDir, scope, enableHooks, showProgress = false) {
+    const sources = {
+        agents: join(TEMPLATES_DIR, 'agents'),
+        skills: join(TEMPLATES_DIR, 'skills'),
+        hooks: join(TEMPLATES_DIR, 'hooks'),
+    };
+
+    const targets = {
+        agents: join(targetDir, 'agents'),
+        skills: join(targetDir, 'skills'),
+        hooks: join(targetDir, 'hooks'),
+    };
 
     // Create target directory
     if (!existsSync(targetDir)) {
         mkdirSync(targetDir, { recursive: true });
     }
 
-    // Copy agents
-    console.log('  Copying agents...');
-    if (hasAgents && force) {
-        rmSync(agentsTarget, { recursive: true, force: true });
-    }
-    const agentsCopied = copyDir(agentsSource, agentsTarget);
-    console.log(`    ${agentsCopied} agents`);
+    // Copy each component
+    for (const [name, source] of Object.entries(sources)) {
+        if (!existsSync(source)) continue;
 
-    // Copy skills
-    console.log('  Copying skills...');
-    if (hasSkills && force) {
-        rmSync(skillsTarget, { recursive: true, force: true });
-    }
-    const skillsCopied = copyDir(skillsSource, skillsTarget);
-    const skillCount = countDirs(skillsTarget);
-    console.log(`    ${skillCount} skills (${skillsCopied} files)`);
+        const target = targets[name];
+        if (existsSync(target)) {
+            rmSync(target, { recursive: true, force: true });
+        }
 
-    // Copy commands
-    console.log('  Copying commands...');
-    if (hasCommands && force) {
-        rmSync(commandsTarget, { recursive: true, force: true });
-    }
-    const commandsCopied = copyDir(commandsSource, commandsTarget);
-    console.log(`    ${commandsCopied} commands`);
+        const count = copyDir(source, target);
+        const label = name === 'skills' ? `${countDirs(target)} skills` : `${count} ${name}`;
 
-    // Copy CODEHOGG.md (auto-update instructions for Claude)
-    const codehoggMdSource = join(TEMPLATES_DIR, 'CODEHOGG.md');
-    const codehoggMdTarget = join(targetDir, 'CODEHOGG.md');
-    if (existsSync(codehoggMdSource)) {
-        copyFileSync(codehoggMdSource, codehoggMdTarget);
+        if (showProgress) {
+            console.log(`    ${c.green}${sym.check}${c.reset} ${label}`);
+        }
     }
 
-    // Write timestamp for auto-update tracking
+    // Copy CODEHOGG.md
+    const codehoggSrc = join(TEMPLATES_DIR, 'CODEHOGG.md');
+    const codehoggDest = join(targetDir, 'CODEHOGG.md');
+    if (existsSync(codehoggSrc)) {
+        copyFileSync(codehoggSrc, codehoggDest);
+    }
+
+    // Write timestamp
     const timestampFile = join(targetDir, '.codehogg-updated');
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    writeFileSync(timestampFile, today);
+    writeFileSync(timestampFile, new Date().toISOString().split('T')[0]);
 
-    console.log('\n  Installation complete!\n');
-    console.log('  Architecture:');
-    console.log('    agents/   - Specialized workers (proactive, isolated context)');
-    console.log('    skills/   - Domain knowledge (auto-loaded when relevant)');
-    console.log('    commands/ - Slash commands (user-invoked orchestration)');
-    console.log('\n  Quick start:');
-    console.log('    /audit-quick     - Run 7 key consultant agents');
-    console.log('    /audit-full      - Run all 18 consultant agents');
-    console.log('    /explore-concepts - Generate 3 design directions');
-    console.log('\n  Run /help in Claude Code to see all commands.\n');
+    // Configure hooks if requested
+    if (enableHooks) {
+        // Determine settings path
+        let settingsPath;
+        if (scope === 'global') {
+            settingsPath = join(targetDir, 'settings.json');
+        } else {
+            // For project scope, use settings.local.json in project .claude/
+            settingsPath = join(targetDir, 'settings.local.json');
+        }
+
+        configureHooks(settingsPath, scope);
+
+        if (showProgress) {
+            console.log(`    ${c.green}${sym.check}${c.reset} hooks configured in ${scope === 'global' ? 'settings.json' : 'settings.local.json'}`);
+        }
+    }
+
+    return true;
 }
 
-// Update command
-function update(isGlobal, customPath = null) {
-    const targetDir = getTargetDir(isGlobal, customPath);
+// Non-interactive init
+function init(scope, force, customPath = null, skipHooks = false) {
+    const targetDir = getTargetDir(scope, customPath);
 
     if (!targetDir) {
-        showPathError(isGlobal);
-        return;
-    }
-
-    const scope = customPath ? 'custom' : (isGlobal ? 'global' : 'project');
-
-    if (!existsSync(targetDir)) {
-        console.log(`\n  No ${scope} installation found at: ${targetDir}`);
-        console.log('  Run "codehogg init" first.\n');
+        console.error(`\n  ${c.red}Error:${c.reset} Cannot determine installation directory.\n`);
+        if (scope === 'global') {
+            console.log(`  ${c.dim}Try: npx codehogg init --path ~/.claude${c.reset}\n`);
+        }
         process.exit(1);
     }
 
-    console.log(`\n  Updating ${scope} installation...\n`);
+    const validation = validatePath(targetDir);
+    if (!validation.valid) {
+        console.error(`\n  ${c.red}Error:${c.reset} ${validation.error}\n`);
+        process.exit(1);
+    }
 
-    // Force update by calling init with force flag
-    init(isGlobal, true, customPath);
+    const scopeLabel = customPath ? `custom (${targetDir})` : (scope === 'global' ? 'global (~/.claude/)' : 'project (./.claude/)');
+
+    console.log(`\n  ${c.bold}codehogg${c.reset} v${getVersion()}`);
+    console.log(`  Installing to ${scopeLabel}\n`);
+
+    // Check for existing
+    const hasExisting = existsSync(join(targetDir, 'agents')) ||
+                        existsSync(join(targetDir, 'skills'));
+
+    if (hasExisting && !force) {
+        console.log(`  ${c.yellow}${sym.warn}${c.reset} Existing installation detected.`);
+        console.log(`  Use --force to overwrite, or 'codehogg update' to update.\n`);
+        process.exit(1);
+    }
+
+    doInstall(targetDir, scope, !skipHooks, true);
+
+    console.log(`\n  ${c.green}Installation complete!${c.reset}`);
+    console.log(`\n  ${c.dim}Run /help in Claude Code to see all commands.${c.reset}\n`);
+}
+
+// Update command
+function update(scope, customPath = null) {
+    const targetDir = getTargetDir(scope, customPath);
+
+    if (!targetDir || !existsSync(targetDir)) {
+        console.log(`\n  ${c.red}Error:${c.reset} No installation found.`);
+        console.log(`  Run 'codehogg init' first.\n`);
+        process.exit(1);
+    }
+
+    console.log(`\n  ${c.bold}codehogg${c.reset} v${getVersion()}`);
+    console.log(`  Updating ${scope} installation...\n`);
+
+    // Check if hooks were enabled
+    const settingsPath = scope === 'global'
+        ? join(targetDir, 'settings.json')
+        : join(targetDir, 'settings.local.json');
+
+    let hasHooks = false;
+    if (existsSync(settingsPath)) {
+        try {
+            const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+            hasHooks = !!settings.hooks;
+        } catch {}
+    }
+
+    doInstall(targetDir, scope, hasHooks, true);
+
+    console.log(`\n  ${c.green}Update complete!${c.reset}\n`);
 }
 
 // Uninstall command
-function uninstall(isGlobal, customPath = null) {
-    const targetDir = getTargetDir(isGlobal, customPath);
+function uninstall(scope, customPath = null) {
+    const targetDir = getTargetDir(scope, customPath);
 
     if (!targetDir) {
-        showPathError(isGlobal);
-        return;
+        console.error(`\n  ${c.red}Error:${c.reset} Cannot determine installation directory.\n`);
+        process.exit(1);
     }
 
-    const agentsTarget = join(targetDir, 'agents');
-    const skillsTarget = join(targetDir, 'skills');
-    const commandsTarget = join(targetDir, 'commands');
-    const codehoggMdTarget = join(targetDir, 'CODEHOGG.md');
-    const timestampFile = join(targetDir, '.codehogg-updated');
-    const scope = customPath ? 'custom' : (isGlobal ? 'global' : 'project');
-
-    console.log(`\n  codehogg v${getVersion()}`);
+    console.log(`\n  ${c.bold}codehogg${c.reset} v${getVersion()}`);
     console.log(`  Uninstalling from ${scope}...\n`);
 
     let removed = false;
 
-    if (existsSync(agentsTarget)) {
-        rmSync(agentsTarget, { recursive: true, force: true });
-        console.log('    Removed agents/');
-        removed = true;
+    const dirs = ['agents', 'skills', 'hooks'];
+    for (const dir of dirs) {
+        const p = join(targetDir, dir);
+        if (existsSync(p)) {
+            rmSync(p, { recursive: true, force: true });
+            console.log(`    ${c.green}${sym.check}${c.reset} Removed ${dir}/`);
+            removed = true;
+        }
     }
 
-    if (existsSync(skillsTarget)) {
-        rmSync(skillsTarget, { recursive: true, force: true });
-        console.log('    Removed skills/');
-        removed = true;
+    // Clean up files
+    for (const file of ['CODEHOGG.md', '.codehogg-updated']) {
+        const p = join(targetDir, file);
+        if (existsSync(p)) {
+            rmSync(p);
+            removed = true;
+        }
     }
 
-    if (existsSync(commandsTarget)) {
-        rmSync(commandsTarget, { recursive: true, force: true });
-        console.log('    Removed commands/');
-        removed = true;
-    }
+    // Remove hooks from settings
+    const settingsPath = scope === 'global'
+        ? join(targetDir, 'settings.json')
+        : join(targetDir, 'settings.local.json');
 
-    // Clean up meta files
-    if (existsSync(codehoggMdTarget)) {
-        rmSync(codehoggMdTarget);
-        removed = true;
-    }
-    if (existsSync(timestampFile)) {
-        rmSync(timestampFile);
-        removed = true;
+    if (removeHooksConfig(settingsPath)) {
+        console.log(`    ${c.green}${sym.check}${c.reset} Removed hooks from settings`);
     }
 
     if (removed) {
-        console.log('\n  Uninstall complete.\n');
-        console.log('  Note: settings.local.json was preserved.\n');
+        console.log(`\n  ${c.green}Uninstall complete.${c.reset}\n`);
     } else {
-        console.log('  Nothing to uninstall.\n');
+        console.log(`  Nothing to uninstall.\n`);
     }
 }
 
 // Status command
 function status(customPath = null) {
-    const localDir = getTargetDir(false, customPath);
-    const globalDir = getTargetDir(true);
+    console.log(`\n  ${c.bold}codehogg${c.reset} v${getVersion()}\n`);
 
-    console.log(`\n  codehogg v${getVersion()}\n`);
+    const showScope = (label, dir) => {
+        if (!dir) {
+            console.log(`  ${label}: ${c.dim}Unable to determine directory${c.reset}`);
+            return;
+        }
 
-    // Check custom path if provided
+        const agents = countFiles(join(dir, 'agents'));
+        const skills = countDirs(join(dir, 'skills'));
+        const hooks = countFiles(join(dir, 'hooks'));
+
+        console.log(`  ${label}:`);
+        if (agents > 0 || skills > 0) {
+            console.log(`    ${c.green}${sym.check}${c.reset} ${agents} agents, ${skills} skills, ${hooks} hooks`);
+
+            // Check hooks config
+            const settingsPath = label.includes('Global')
+                ? join(dir, 'settings.json')
+                : join(dir, 'settings.local.json');
+
+            if (existsSync(settingsPath)) {
+                try {
+                    const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+                    if (settings.hooks) {
+                        console.log(`    ${c.green}${sym.check}${c.reset} Hooks enabled`);
+                    }
+                } catch {}
+            }
+        } else {
+            console.log(`    ${c.dim}Not installed${c.reset}`);
+        }
+    };
+
     if (customPath) {
-        const customAgents = countFiles(join(localDir, 'agents'));
-        const customSkills = countDirs(join(localDir, 'skills'));
-        const customCommands = countFiles(join(localDir, 'commands'));
-
-        console.log(`  Custom (${localDir}):`);
-        if (customAgents > 0 || customSkills > 0 || customCommands > 0) {
-            console.log(`    ${customAgents} agents, ${customSkills} skills, ${customCommands} commands`);
-        } else {
-            console.log('    Not installed');
-        }
+        showScope(`Custom (${customPath})`, getTargetDir('project', customPath));
+    } else {
+        showScope('Project (./.claude/)', getTargetDir('project'));
         console.log('');
-        return;
-    }
-
-    // Check local
-    const localAgents = countFiles(join(localDir, 'agents'));
-    const localSkills = countDirs(join(localDir, 'skills'));
-    const localCommands = countFiles(join(localDir, 'commands'));
-
-    console.log('  Project (./.claude/):');
-    if (localAgents > 0 || localSkills > 0 || localCommands > 0) {
-        console.log(`    ${localAgents} agents, ${localSkills} skills, ${localCommands} commands`);
-    } else {
-        console.log('    Not installed');
-    }
-
-    // Check global
-    if (globalDir) {
-        const globalAgents = countFiles(join(globalDir, 'agents'));
-        const globalSkills = countDirs(join(globalDir, 'skills'));
-        const globalCommands = countFiles(join(globalDir, 'commands'));
-
-        console.log(`\n  Global (~/.claude/):`);
-        if (globalAgents > 0 || globalSkills > 0 || globalCommands > 0) {
-            console.log(`    ${globalAgents} agents, ${globalSkills} skills, ${globalCommands} commands`);
-        } else {
-            console.log('    Not installed');
-        }
-    } else {
-        console.log('\n  Global (~/.claude/):');
-        console.log('    Unable to determine home directory');
+        showScope('Global (~/.claude/)', getTargetDir('global'));
     }
 
     console.log('');
@@ -384,107 +550,112 @@ function status(customPath = null) {
 // Help
 function showHelp() {
     console.log(`
-  codehogg v${getVersion()}
+  ${c.bold}codehogg${c.reset} v${getVersion()}
 
-  28 specialized agents with 21 domain skills for Claude Code.
+  ${c.dim}29 agents with 43 skills for Claude Code.${c.reset}
 
-  Usage:
-    codehogg <command> [options]
+  ${c.bold}Usage:${c.reset}
+    codehogg [command] [options]
 
-  Commands:
-    init              Install to current project (./.claude/)
-    init --global     Install globally (~/.claude/)
-    update            Update project installation
-    update --global   Update global installation
-    uninstall         Remove from project
-    uninstall --global Remove global installation
-    status            Show installation status
-    version           Show version
-    help              Show this help
+  ${c.bold}Commands:${c.reset}
+    ${c.cyan}init${c.reset}              Interactive installation wizard
+    ${c.cyan}init --global${c.reset}     Install globally (~/.claude/)
+    ${c.cyan}init --local${c.reset}      Install to current project (./.claude/)
+    ${c.cyan}update${c.reset}            Update project installation
+    ${c.cyan}update --global${c.reset}   Update global installation
+    ${c.cyan}uninstall${c.reset}         Remove from project
+    ${c.cyan}status${c.reset}            Show installation status
+    ${c.cyan}help${c.reset}              Show this help
 
-  Options:
-    --global, -g      Target global ~/.claude/ instead of project
+  ${c.bold}Options:${c.reset}
+    --global, -g      Target global ~/.claude/
+    --local, -l       Target project ./.claude/ (non-interactive)
     --force, -f       Overwrite existing installation
-    --path <dir>      Install to custom directory (useful for npm prefix issues)
+    --no-hooks        Skip hooks configuration
+    --path <dir>      Install to custom directory
 
-  Examples:
-    npx codehogg init              # Install to current project
-    npx codehogg init -g           # Install globally
-    npx codehogg init --path ~/.claude  # Custom path (workaround for npm issues)
-    npx codehogg update            # Update project to latest
-    npx codehogg status            # Check what's installed
+  ${c.bold}Examples:${c.reset}
+    npx codehogg init              ${c.dim}# Interactive wizard${c.reset}
+    npx codehogg init -g           ${c.dim}# Quick global install${c.reset}
+    npx codehogg init -l           ${c.dim}# Quick project install${c.reset}
+    npx codehogg update -g         ${c.dim}# Update global installation${c.reset}
 
-  Troubleshooting:
-    If you get "ENOENT: no such file or directory" errors:
-      1. Run: npm config delete prefix
-      2. Or use: npx codehogg init --path ~/.claude
-
-  Architecture:
-    agents/   - Specialized workers (run in isolated context)
-    skills/   - Domain knowledge (auto-loaded when relevant)
-    commands/ - Orchestration (user-invoked slash commands)
-
-  After installation, use these commands in Claude Code:
-    /audit-full       Run all 18 consultant agents
-    /audit-quick      Run 7 key consultant agents
-    /plan-full        Full 5-phase planning workflow
-    /test-ux-personas Simulate 6 user personas testing your app
-    /explore-concepts Generate 3 design directions
+  ${c.bold}After installation:${c.reset}
+    /audit-full       ${c.dim}Run all 18 consultant agents${c.reset}
+    /audit-quick      ${c.dim}Run 7 key consultant agents${c.reset}
+    /plan-full        ${c.dim}Full 5-phase planning workflow${c.reset}
+    /explore-concepts ${c.dim}Generate 3 design directions${c.reset}
 `);
 }
 
-// Parse --path argument
-function getCustomPath(args) {
-    const pathIndex = args.indexOf('--path');
-    if (pathIndex !== -1 && args[pathIndex + 1]) {
-        let customPath = args[pathIndex + 1];
-        // Expand ~ to home directory
-        if (customPath.startsWith('~')) {
-            const home = getSafeHomedir();
-            if (home) {
-                customPath = customPath.replace('~', home);
-            }
-        }
-        return customPath;
-    }
-    return null;
+// Parse arguments
+function parseArgs(args) {
+    return {
+        command: args.find(a => !a.startsWith('-')) || null,
+        global: args.includes('--global') || args.includes('-g'),
+        local: args.includes('--local') || args.includes('-l'),
+        force: args.includes('--force') || args.includes('-f'),
+        noHooks: args.includes('--no-hooks'),
+        path: (() => {
+            const idx = args.indexOf('--path');
+            return idx !== -1 ? args[idx + 1] : null;
+        })(),
+    };
 }
 
-// Parse args and run
-export function run(args) {
-    const command = args[0];
-    const isGlobal = args.includes('--global') || args.includes('-g');
-    const force = args.includes('--force') || args.includes('-f');
-    const customPath = getCustomPath(args);
+// Main entry point
+export async function run(args) {
+    const opts = parseArgs(args);
 
-    switch (command) {
+    switch (opts.command) {
         case 'init':
-            init(isGlobal, force, customPath);
+            if (opts.global || opts.local || opts.path) {
+                // Non-interactive mode
+                const scope = opts.global ? 'global' : 'project';
+                init(scope, opts.force, opts.path, opts.noHooks);
+            } else {
+                // Interactive mode
+                await interactiveInit();
+            }
             break;
+
         case 'update':
-            update(isGlobal, customPath);
+            update(opts.global ? 'global' : 'project', opts.path);
             break;
+
         case 'uninstall':
         case 'remove':
-            uninstall(isGlobal, customPath);
+            uninstall(opts.global ? 'global' : 'project', opts.path);
             break;
+
         case 'status':
-            status(customPath);
+            status(opts.path);
             break;
+
         case 'version':
         case '-v':
         case '--version':
             console.log(getVersion());
             break;
+
         case 'help':
         case '--help':
         case '-h':
-        case undefined:
             showHelp();
             break;
+
+        case null:
+            // No command - show interactive or help
+            if (process.stdout.isTTY) {
+                await interactiveInit();
+            } else {
+                showHelp();
+            }
+            break;
+
         default:
-            console.log(`\n  Unknown command: ${command}`);
-            console.log('  Run "codehogg help" for usage.\n');
+            console.log(`\n  ${c.red}Unknown command:${c.reset} ${opts.command}`);
+            console.log(`  Run 'codehogg help' for usage.\n`);
             process.exit(1);
     }
 }

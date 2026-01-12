@@ -1,6 +1,7 @@
 ---
 name: docs-consultant
 description: Provides expert documentation analysis, API docs review, and knowledge management assessment. Use this skill when the user needs documentation audit, README review, or technical writing evaluation. Triggers include requests for docs audit, API documentation review, or when asked to evaluate documentation coverage and quality. Produces detailed consultant-style reports with findings and prioritized recommendations — does NOT write implementation code.
+aliases: [audit-docs, plan-docs]
 ---
 
 # Documentation Consultant
@@ -200,3 +201,191 @@ Save to: `planning-docs/{feature-slug}/11-documentation-plan.md`
 3. **Audience-aware** - Consider who reads the docs
 4. **Maintenance-focused** - Suggest sustainable practices
 5. **Tool-aware** - Recommend appropriate documentation tools
+
+---
+
+## Slash Command Invocation
+
+This skill can be invoked via:
+- `/docs-consultant` - Full skill with methodology
+- `/audit-docs` - Quick assessment mode
+- `/plan-docs` - Design/planning mode
+
+### Assessment Mode (/audit-docs)
+
+# ULTRATHINK: Documentation Assessment
+
+ultrathink - Invoke the **docs-consultant** subagent for comprehensive documentation evaluation.
+
+## Output Location
+
+**Targeted Reviews:** When a specific feature/area is provided, save to:
+`./audit-reports/{target-slug}/documentation-assessment.md`
+
+**Full Codebase Reviews:** When no target is specified, save to:
+`./audit-reports/documentation-assessment.md`
+
+### Target Slug Generation
+Convert the target argument to a URL-safe folder name:
+- `API Endpoints` → `api-endpoints`
+- `User Guide` → `user-guide`
+- `Developer Setup` → `developer-setup`
+
+Create the directory if it doesn't exist:
+```bash
+mkdir -p ./audit-reports/{target-slug}
+```
+
+## What Gets Evaluated
+
+### Documentation Coverage
+- README completeness
+- API documentation
+- Architecture documentation
+- Setup/installation guides
+- Troubleshooting guides
+
+### Code Documentation
+- Function/method documentation
+- Complex logic explanations
+- Type definitions
+- Inline comment quality
+
+### Organization
+- Information architecture
+- Navigation and discoverability
+- Cross-referencing
+- Search effectiveness
+
+### Accuracy
+- Outdated information
+- Broken links
+- Incorrect examples
+- Version mismatches
+
+### Onboarding
+- Getting started guide
+- Prerequisites clarity
+- First-run experience
+- Common pitfalls addressed
+
+## Target
+$ARGUMENTS
+
+## Minimal Return Pattern (for batch audits)
+
+When invoked as part of a batch audit (`/audit-full`, `/audit-ops`):
+1. Write your full report to the designated file path
+2. Return ONLY a brief status message to the parent:
+
+```
+✓ Documentation Assessment Complete
+  Saved to: {filepath}
+  Critical: X | High: Y | Medium: Z
+  Key finding: {one-line summary of most important issue}
+```
+
+This prevents context overflow when multiple consultants run in parallel.
+
+## Output Format
+Deliver formal documentation assessment to the appropriate path with:
+- **Executive Summary**
+- **Documentation Coverage Score (%)**
+- **Missing Documentation Inventory**
+- **Outdated Content List**
+- **Organization Improvements**
+- **Priority Documentation Needs**
+- **Quick Wins**
+- **Documentation Roadmap**
+
+**Be specific about documentation gaps. Reference exact files and missing sections.**
+
+### Design Mode (/plan-docs)
+
+---name: plan-docsdescription: 📚 ULTRATHINK Documentation Design - What docs to create and when
+---
+
+# Documentation Design
+
+Invoke the **docs-consultant** in Design Mode for documentation planning.
+
+## Target Feature
+
+$ARGUMENTS
+
+## Output Location
+
+Save to: `planning-docs/{feature-slug}/11-documentation-plan.md`
+
+## Design Considerations
+
+### Documentation Coverage
+- README updates needed
+- API documentation requirements
+- Architecture documentation
+- Setup/installation guides
+- Troubleshooting guides
+
+### Code Documentation
+- Function/method documentation standards
+- Complex logic explanations
+- Type definitions
+- Inline comment requirements
+- Example code snippets
+
+### User Documentation
+- End-user guides
+- Feature walkthroughs
+- FAQ content
+- Tutorial content
+- Video/screenshot needs
+
+### Developer Documentation
+- Technical implementation docs
+- Integration guides
+- Contribution guidelines
+- Code review standards
+- Debugging guides
+
+### API Documentation
+- Endpoint documentation format
+- Request/response examples
+- Error code documentation
+- Authentication docs
+- Rate limit documentation
+
+### Organization & Discoverability
+- Documentation structure
+- Navigation updates
+- Cross-referencing
+- Search optimization
+- Version management
+
+## Design Deliverables
+
+1. **Documentation Plan** - What docs to create, in what order
+2. **API Documentation Spec** - Endpoints to document, format to use
+3. **User Documentation** - End-user guides needed
+4. **Developer Documentation** - Technical docs for maintainers
+5. **Architecture Documentation** - System design docs needed
+6. **Changelog Strategy** - How to communicate changes
+
+## Output Format
+
+Deliver documentation design document with:
+- **Documentation Inventory** (type, audience, priority)
+- **Documentation Templates** (for consistency)
+- **Writing Standards** (voice, format, structure)
+- **Timeline/Phasing** (what to document when)
+- **Ownership Matrix** (who writes what)
+- **Review Process** (how docs are validated)
+
+**Be specific about documentation needs. Identify gaps that need filling.**
+
+## Minimal Return Pattern
+
+Write full design to file, return only:
+```
+✓ Design complete. Saved to {filepath}
+  Key decisions: {1-2 sentence summary}
+```

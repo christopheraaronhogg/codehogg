@@ -20,14 +20,6 @@ When Claude finishes responding:
 - Determines if task was completed, blocked, or errored
 - Updates task status in CLAUDE.md
 
-### `update-claude-tasks.cjs`
-**Event**: `PostToolUse` (Edit|Write)
-
-When files are edited:
-- Matches file changes to tasks in CLAUDE.md
-- Auto-checks tasks when relevant files are modified
-- Uses smart keyword matching (file names, PascalCase, backticks)
-
 ## Task Status Markers
 
 | Marker | Meaning |
@@ -36,9 +28,9 @@ When files are edited:
 | `- [x]` | Completed |
 | `- [!]` | Blocked/Error |
 
-## Configuration
+## Installation
 
-Add to your `.claude/settings.json`:
+After running `npx codehogg init`, add this to your `.claude/settings.json` or `~/.claude/settings.json`:
 
 ```json
 {
@@ -48,21 +40,9 @@ Add to your `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/on-prompt-submit.cjs\"",
+            "command": "node .claude/hooks/on-prompt-submit.cjs",
             "timeout": 5,
             "once": true
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/update-claude-tasks.cjs\"",
-            "timeout": 10
           }
         ]
       }
@@ -72,7 +52,7 @@ Add to your `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/on-stop.cjs\"",
+            "command": "node .claude/hooks/on-stop.cjs",
             "timeout": 10
           }
         ]
@@ -82,8 +62,8 @@ Add to your `.claude/settings.json`:
 }
 ```
 
+**Note:** Uses relative paths (`.claude/hooks/...`) which work on Windows, macOS, and Linux.
+
 ## Debugging
 
-Set `DEBUG_HOOK=1` environment variable to enable verbose logging:
-- Logs written to `.claude/hook-debug.log`
-- Task updates logged to `.claude/task-updates.log`
+Set `DEBUG_HOOK=1` environment variable to enable verbose logging.

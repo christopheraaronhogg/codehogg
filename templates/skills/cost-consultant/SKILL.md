@@ -1,6 +1,7 @@
 ---
 name: cost-consultant
 description: Provides expert cloud cost analysis, FinOps assessment, and resource optimization recommendations. Use this skill when the user needs cloud cost review, infrastructure spend analysis, or optimization strategy. Triggers include requests for cost audit, FinOps assessment, resource optimization, or when asked to evaluate cloud spending patterns. Produces detailed consultant-style reports with findings and prioritized recommendations — does NOT write implementation code.
+aliases: [audit-cost, plan-cost]
 ---
 
 # Cost Consultant
@@ -199,3 +200,190 @@ Save to: `planning-docs/{feature-slug}/10-cost-projections.md`
 3. **ROI-focused** - Quantify savings potential
 4. **Risk-aware** - Note reliability trade-offs
 5. **Actionable** - Provide specific next steps
+
+---
+
+## Slash Command Invocation
+
+This skill can be invoked via:
+- `/cost-consultant` - Full skill with methodology
+- `/audit-cost` - Quick assessment mode
+- `/plan-cost` - Design/planning mode
+
+### Assessment Mode (/audit-cost)
+
+# ULTRATHINK: Cost Assessment
+
+ultrathink - Invoke the **cost-consultant** subagent for comprehensive cloud cost evaluation.
+
+## Output Location
+
+**Targeted Reviews:** When a specific service/feature is provided, save to:
+`./audit-reports/{target-slug}/cost-assessment.md`
+
+**Full Codebase Reviews:** When no target is specified, save to:
+`./audit-reports/cost-assessment.md`
+
+### Target Slug Generation
+Convert the target argument to a URL-safe folder name:
+- `Image Processing` → `image-processing`
+- `Storage Layer` → `storage`
+- `API Services` → `api-services`
+
+Create the directory if it doesn't exist:
+```bash
+mkdir -p ./audit-reports/{target-slug}
+```
+
+## What Gets Evaluated
+
+### Resource Utilization
+- Compute resource sizing
+- Storage optimization
+- Database tier appropriateness
+- CDN and caching usage
+
+### Cost Drivers
+- Identify top spending categories
+- API call volumes
+- Data transfer costs
+- Third-party service costs
+
+### Optimization Opportunities
+- Reserved capacity candidates
+- Spot/preemptible workloads
+- Auto-scaling effectiveness
+- Idle resource detection
+
+### Code-Level Costs
+- Expensive operations
+- Unnecessary API calls
+- Inefficient queries
+- Redundant processing
+
+### FinOps Maturity
+- Cost visibility
+- Budget controls
+- Allocation tagging
+- Anomaly detection
+
+## Target
+$ARGUMENTS
+
+## Minimal Return Pattern (for batch audits)
+
+When invoked as part of a batch audit (`/audit-full`, `/audit-ops`):
+1. Write your full report to the designated file path
+2. Return ONLY a brief status message to the parent:
+
+```
+✓ Cost Assessment Complete
+  Saved to: {filepath}
+  Critical: X | High: Y | Medium: Z
+  Key finding: {one-line summary of most important issue}
+```
+
+This prevents context overflow when multiple consultants run in parallel.
+
+## Output Format
+Deliver formal cost assessment to the appropriate path with:
+- **Executive Summary**
+- **Current Cost Estimate (monthly)**
+- **Cost Breakdown by Category**
+- **Top 10 Optimization Opportunities**
+- **Estimated Savings (per optimization)**
+- **FinOps Maturity Score (1-5)**
+- **Implementation Roadmap**
+- **Quick Wins vs Strategic Changes**
+
+**Be specific about cost drivers. Reference exact services and inefficient patterns.**
+
+### Design Mode (/plan-cost)
+
+---name: plan-costdescription: 💰 ULTRATHINK Cost Design - Resource projections, budgets, ROI
+---
+
+# Cost Design
+
+Invoke the **cost-consultant** in Design Mode for cost projection and budget planning.
+
+## Target Feature
+
+$ARGUMENTS
+
+## Output Location
+
+Save to: `planning-docs/{feature-slug}/10-cost-projections.md`
+
+## Design Considerations
+
+### Resource Requirements
+- Compute resources (CPU, memory)
+- Storage requirements (database, files, cache)
+- Network/bandwidth needs
+- CDN requirements
+- Third-party service usage
+
+### Cost Drivers Analysis
+- Primary cost components
+- Variable vs. fixed costs
+- Per-user vs. per-transaction costs
+- Third-party API costs
+- Infrastructure overhead
+
+### Scaling Cost Model
+- How costs change with user growth
+- How costs change with data growth
+- Horizontal vs. vertical scaling costs
+- Reserved capacity opportunities
+- Spot/preemptible workload candidates
+
+### Optimization Opportunities
+- Built-in cost efficiency patterns
+- Caching to reduce compute
+- Async processing to reduce peak load
+- Storage tiering strategies
+- Auto-scaling configuration
+
+### Budget Planning
+- Initial implementation costs
+- Monthly operational costs
+- Growth projections
+- Cost allocation by component
+- Budget buffer recommendations
+
+### FinOps Considerations
+- Cost visibility requirements
+- Tagging/allocation strategy
+- Anomaly detection needs
+- Cost review cadence
+- Optimization triggers
+
+## Design Deliverables
+
+1. **Resource Projections** - Expected compute, storage, database needs
+2. **Cost Estimates** - Monthly/annual cost projections by category
+3. **Scaling Considerations** - How costs change with growth
+4. **Optimization Opportunities** - Built-in cost efficiency from the start
+5. **Budget Recommendations** - Suggested budget allocation
+6. **ROI Analysis** - Expected return vs. infrastructure cost
+
+## Output Format
+
+Deliver cost design document with:
+- **Cost Breakdown Table** (category, monthly, annual)
+- **Scaling Cost Model** (chart or table showing growth impact)
+- **Resource Sizing Recommendations**
+- **Optimization Checklist** (built-in efficiency measures)
+- **Budget Allocation** (by component/phase)
+- **ROI Calculation** (if applicable)
+
+**Be specific about cost drivers. Provide concrete estimates where possible.**
+
+## Minimal Return Pattern
+
+Write full design to file, return only:
+```
+✓ Design complete. Saved to {filepath}
+  Key decisions: {1-2 sentence summary}
+```
