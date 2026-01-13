@@ -1,4 +1,6 @@
----name: plan-frontenddescription: 🎨 ULTRATHINK Frontend Planning - UI, UX, Copy, Performance, SEO (5 consultants)
+---
+name: plan-frontend
+description: 🎨 ULTRATHINK Frontend Planning - UI, UX, Copy, Performance, SEO (5 consultants)
 ---
 
 # Frontend Planning (5 Consultants)

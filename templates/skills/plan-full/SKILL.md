@@ -1,4 +1,6 @@
----name: plan-fulldescription: 🚀 Full Feature Planning - Interactive interview, collaborative PRD, expert roundtable, and sequenced implementation plan
+---
+name: plan-full
+description: 🚀 Full Feature Planning - Interactive interview, collaborative PRD, expert roundtable, and sequenced implementation plan
 ---
 
 # Full Feature Planning

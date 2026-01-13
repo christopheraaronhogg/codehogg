@@ -1,4 +1,5 @@
 ---
+name: audit-quality
 description: 🏛️ ULTRATHINK Quality Audit - Architecture, Code Quality, Requirements (3 consultants in parallel)
 ---
 

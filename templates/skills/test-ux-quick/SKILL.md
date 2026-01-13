@@ -1,4 +1,6 @@
----name: test-ux-quickdescription: ⚡ Quick UX Test - Fast smoke test with 2 personas (first-timer + mobile) for rapid feedback
+---
+name: test-ux-quick
+description: ⚡ Quick UX Test - Fast smoke test with 2 personas (first-timer + mobile) for rapid feedback
 ---
 
 # Quick UX Test

@@ -1,4 +1,6 @@
----name: audit-quickdescription: ⚡ Quick Audit - Run 7 key consultant agents in 2 waves for fast comprehensive overview
+---
+name: audit-quick
+description: ⚡ Quick Audit - Run 7 key consultant agents in 2 waves for fast comprehensive overview
 ---
 
 # Quick Audit (7 Agents)

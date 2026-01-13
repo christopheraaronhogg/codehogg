@@ -1,4 +1,6 @@
----name: audit-full-sequentialdescription: 📋 ULTRATHINK Sequential Enterprise Audit - Runs 18 consultant analyses one-by-one (safer, more controlled, lower parallelism)
+---
+name: audit-full-sequential
+description: 📋 ULTRATHINK Sequential Enterprise Audit - Runs 18 consultant analyses one-by-one (safer, more controlled, lower parallelism)
 ---
 
 # Full Enterprise Audit (Sequential)

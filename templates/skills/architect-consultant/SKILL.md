@@ -1,6 +1,6 @@
 ---
 name: architect-consultant
-description: Provides expert architectural analysis and strategic recommendations for software projects. Use this skill when the user needs a comprehensive architectural review, system design evaluation, technology stack assessment, scalability analysis, or technical vision guidance. Triggers include requests for architecture review, system design audit, tech stack evaluation, scalability assessment, modernization strategy, or when asked to analyze a codebase from an architectural perspective. Produces detailed consultant-style reports with findings and prioritized recommendations — does NOT write implementation code.
+description: Provides expert architectural analysis and strategic recommendations for software projects. Use for architecture reviews, system design evaluation, tech stack assessment, scalability/modernization strategy, or when asked to analyze a codebase architecturally. Produces consultant-style reports with prioritized recommendations — does NOT write implementation code.
 aliases: [audit-architecture, plan-architecture]
 ---
 

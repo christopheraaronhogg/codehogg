@@ -1,4 +1,6 @@
----name: plan-quickdescription: ⚡ ULTRATHINK Quick Planning - 7 key consultants for moderate features
+---
+name: plan-quick
+description: ⚡ ULTRATHINK Quick Planning - 7 key consultants for moderate features
 ---
 
 # Quick Feature Planning (7 Consultants)

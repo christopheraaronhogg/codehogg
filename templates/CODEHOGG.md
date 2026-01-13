@@ -1,6 +1,6 @@
 # Codehogg Plugin System
 
-This project uses **codehogg** for Claude Code agents, skills, and commands.
+This project uses **codehogg** for Claude Code agents and skills.
 
 ## Auto-Update (Daily)
 
@@ -27,8 +27,7 @@ npx codehogg status    # Check installed version
 | Directory | Contents |
 |-----------|----------|
 | `.claude/agents/` | Specialized consultant agents |
-| `.claude/skills/` | Domain knowledge (auto-loaded) |
-| `.claude/commands/` | Slash commands (`/audit-*`, `/plan-*`, etc.) |
+| `.claude/skills/` | Domain knowledge + slash command aliases (`/audit-*`, `/plan-*`, etc.) |
 
 ## Quick Start
 

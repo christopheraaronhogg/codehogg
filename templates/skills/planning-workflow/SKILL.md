@@ -1,3 +1,8 @@
+---
+name: planning-workflow
+description: Multi-phase feature planning methodology from discovery to implementation plan
+---
+
 # Planning Workflow Skill
 
 A comprehensive feature planning methodology modeled after professional software development firms.

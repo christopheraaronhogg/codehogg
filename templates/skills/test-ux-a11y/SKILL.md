@@ -1,4 +1,6 @@
----name: test-ux-a11ydescription: ♿ Accessibility UX Test - Deep keyboard and screen reader testing with David, the accessibility persona
+---
+name: test-ux-a11y
+description: ♿ Accessibility UX Test - Deep keyboard and screen reader testing with David, the accessibility persona
 ---
 
 # Accessibility UX Test

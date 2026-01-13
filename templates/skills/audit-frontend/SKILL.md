@@ -1,4 +1,5 @@
 ---
+name: audit-frontend
 description: 🎨 ULTRATHINK Frontend Audit - UI, UX, Copy, Performance, SEO (5 consultants in parallel)
 ---
 

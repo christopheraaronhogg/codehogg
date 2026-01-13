@@ -1,6 +1,6 @@
 ---
 name: backend-consultant
-description: Provides expert backend systems analysis, API design review, and service architecture assessment. Use this skill when the user needs API design evaluation, service layer review, data access pattern analysis, or integration architecture assessment. Triggers include requests for backend review, API audit, service architecture analysis, or when asked to evaluate server-side code patterns. Produces detailed consultant-style reports with findings and prioritized recommendations — does NOT write implementation code.
+description: Provides expert backend analysis, API/service architecture review, and integration guidance. Use for API design evaluation, service layer review, data access patterns, or when asked to assess server-side code. Produces consultant-style reports with prioritized recommendations — does NOT write implementation code.
 aliases: [audit-api, plan-api]
 ---
 

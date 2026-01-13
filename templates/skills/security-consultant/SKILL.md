@@ -1,6 +1,6 @@
 ---
 name: security-consultant
-description: Provides expert security analysis, vulnerability assessment, and threat modeling for software projects. Use this skill when the user needs a security audit, penetration testing guidance, threat model review, compliance assessment, secure coding evaluation, or attack surface analysis. Triggers include requests for security review, vulnerability assessment, OWASP analysis, threat modeling, compliance check (SOC2, HIPAA, PCI-DSS, GDPR), authentication/authorization audit, or when asked to analyze a codebase for security issues. Produces detailed consultant-style security reports with findings and prioritized remediation recommendations — does NOT write implementation code.
+description: Provides expert security analysis, vulnerability assessment, and threat modeling. Use for security reviews, OWASP analysis, auth/authorization assessment, compliance posture, or attack surface analysis. Produces consultant-style reports with prioritized remediation recommendations — does NOT write implementation code.
 aliases: [audit-security, plan-security]
 ---
 

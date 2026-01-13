@@ -1,7 +1,7 @@
 {
   "name": "codehogg",
-  "description": "Official CodeHogg Plugin Marketplace - 29 agents with 43 skills for comprehensive codebase audits, feature planning, and implementation guidance",
-  "version": "3.0.0",
+  "description": "Official CodeHogg Plugin Marketplace - 29 agents with 43 skills for Claude Code, Codex CLI, and OpenCode",
+  "version": "4.0.0",
   "author": {
     "name": "Christopher Hogg",
     "url": "https://github.com/christopheraaronhogg"
@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "codehogg",
-      "description": "29 agents with 43 skills for comprehensive codebase audits, feature planning, and implementation guidance",
+      "description": "29 agents with 43 skills for Claude Code, Codex CLI, and OpenCode",
       "source": {
         "source": "local",
         "path": "."

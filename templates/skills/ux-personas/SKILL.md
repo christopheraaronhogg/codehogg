@@ -1,3 +1,8 @@
+---
+name: ux-personas
+description: Simulated usability research via persona-driven testing methodology
+---
+
 # UX Personas Testing Skill
 
 Methodology for simulating real user research through browser-based persona testing.

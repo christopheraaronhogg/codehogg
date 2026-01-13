@@ -1,46 +1,68 @@
 # codehogg
 
-**29 specialized agents with 22 domain skills for Claude Code.**
+**29 agents + 43 skills for Claude Code, Codex CLI, and OpenCode.**
 
-Comprehensive codebase audits, feature planning, UX persona testing, and implementation guidance through a three-tier architecture of agents, skills, and commands.
+Comprehensive codebase audits, feature planning, UX persona testing, and implementation guidance through a curated set of agents and skills.
 
 ## Installation
 
-### Quick Start (Project)
+### Quick Start (Interactive)
 
 ```bash
 npx codehogg init
 ```
 
-This installs agents, skills, and commands to your project's `.claude/` directory.
+This runs an interactive wizard to install codehogg for one or more tools.
 
-### Global Installation
+### Non-Interactive Installs
 
 ```bash
-npx codehogg init --global
+# Claude Code (agents + skills)
+npx codehogg init --claude
+npx codehogg init --claude --global
+
+# Codex CLI (skills)
+npx codehogg init --codex
+npx codehogg init --codex --global
+
+# OpenCode (skills + agents)
+npx codehogg init --opencode
+npx codehogg init --opencode --global
 ```
 
-This installs to `~/.claude/` so everything is available across all projects.
+**OpenCode note:** skills install to `.claude/skills` (Claude-compatible path); agents install to `.opencode/agent` (global: `~/.config/opencode/agent`).
 
 ### Keep Up to Date
 
 ```bash
-# Update project installation
+# Update installed tools in this project
 npx codehogg update
 
-# Update global installation
+# Update installed tools globally
 npx codehogg update --global
+
+# Or target a specific tool
+npx codehogg update --tool codex
 ```
 
 ## Architecture
 
-codehogg uses a three-tier system that maps to Claude Code's native constructs:
+codehogg ships **agents + skills**, installed into tool-specific folders:
 
-```
+```text
+# Claude Code
 .claude/
-├── agents/    # Specialized workers (run in isolated context)
-├── skills/    # Domain knowledge (auto-loaded when relevant)
-└── commands/  # Orchestration (user-invoked slash commands)
+├── agents/   # Claude Code agents
+└── skills/   # Skills + slash command aliases
+
+# Codex CLI
+.codex/
+└── skills/   # Skills (invoke as $skill-name)
+
+# OpenCode
+.opencode/
+└── agent/    # OpenCode subagents
+# (OpenCode skills are loaded from .claude/skills)
 ```
 
 ### Agents (29)
@@ -52,7 +74,7 @@ Specialized workers that run in their own context window. Each agent:
 - References skills for domain knowledge
 - Can be proactively triggered by Claude when relevant
 
-### Skills (22)
+### Skills (43)
 
 Domain knowledge that Claude loads automatically when your request matches the skill's description. Skills contain:
 - Evaluation frameworks and methodologies
@@ -376,28 +398,33 @@ Agents read these automatically when gathering context.
 ## CLI Reference
 
 ```bash
-# Install to current project
+# Interactive wizard (choose tool(s) + scope)
 npx codehogg init
 
-# Install globally
-npx codehogg init --global
+# Non-interactive installs
+npx codehogg init --claude
+npx codehogg init --codex
+npx codehogg init --opencode
 
-# Update to latest version
+# Global installs
+npx codehogg init --claude --global
+npx codehogg init --codex --global
+npx codehogg init --opencode --global
+
+# Update (defaults to what's installed)
 npx codehogg update
 npx codehogg update --global
+npx codehogg update --tool codex
 
 # Check installation status
 npx codehogg status
 
 # Uninstall
-npx codehogg uninstall
-npx codehogg uninstall --global
-
-# Force reinstall
-npx codehogg init --force
+npx codehogg uninstall            # interactive
+npx codehogg uninstall --tool codex
 
 # Show version/help
-npx codehogg version
+npx codehogg --version
 npx codehogg help
 ```
 

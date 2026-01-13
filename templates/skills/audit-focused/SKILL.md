@@ -1,4 +1,6 @@
----name: audit-focuseddescription: 🎯 ULTRATHINK Focused Audit - All 15 consultants analyzing a SPECIFIC page/feature in context of the full application
+---
+name: audit-focused
+description: 🎯 ULTRATHINK Focused Audit - All 15 consultants analyzing a SPECIFIC page/feature in context of the full application
 ---
 
 # Focused Audit

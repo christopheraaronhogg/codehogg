@@ -1,4 +1,5 @@
 ---
+name: audit-backend
 description: ⚙️ ULTRATHINK Backend Audit - Backend, Database, Stack, Security, Compliance (5 consultants in parallel)
 ---
 

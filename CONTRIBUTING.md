@@ -76,9 +76,9 @@ codehogg/
 ├── src/
 │   └── cli.js           # CLI implementation
 ├── templates/
-│   ├── agents/          # Agent definitions (29)
-│   ├── skills/          # Unified skills (43)
-│   └── hooks/           # Task tracking hooks (2)
+│   ├── agents/          # Claude Code agent templates (29)
+│   ├── skills/          # Skills (43) for Claude/Codex/OpenCode
+│   └── CODEHOGG.md      # Claude Code project guidance
 ├── package.json
 ├── README.md
 └── CONTRIBUTING.md      # You are here

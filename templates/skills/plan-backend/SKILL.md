@@ -1,4 +1,6 @@
----name: plan-backenddescription: ⚙️ ULTRATHINK Backend Planning - API, Database, Security, Compliance (5 consultants)
+---
+name: plan-backend
+description: ⚙️ ULTRATHINK Backend Planning - API, Database, Security, Compliance (5 consultants)
 ---
 
 # Backend Planning (5 Consultants)

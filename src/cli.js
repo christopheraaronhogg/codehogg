@@ -1,6 +1,17 @@
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
-import { existsSync, mkdirSync, readdirSync, statSync, copyFileSync, readFileSync, writeFileSync, rmSync, accessSync, constants } from 'fs';
+import {
+    accessSync,
+    constants,
+    copyFileSync,
+    existsSync,
+    mkdirSync,
+    readdirSync,
+    readFileSync,
+    rmSync,
+    statSync,
+    writeFileSync,
+} from 'fs';
 import { homedir, platform } from 'os';
 import { createInterface } from 'readline';
 
@@ -8,6 +19,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PACKAGE_ROOT = resolve(__dirname, '..');
 const TEMPLATES_DIR = join(PACKAGE_ROOT, 'templates');
+
+const TOOL_IDS = ['claude', 'codex', 'opencode'];
 
 // ANSI colors (works on Windows 10+, macOS, Linux)
 const c = {
@@ -32,13 +45,11 @@ const sym = {
     info: isWindows ? '[i]' : 'ℹ',
 };
 
-// Get version from package.json
 function getVersion() {
     const pkg = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'));
     return pkg.version;
 }
 
-// Get safe home directory
 function getHomedir() {
     try {
         const home = homedir();
@@ -49,27 +60,6 @@ function getHomedir() {
     }
 }
 
-// Get the target .claude directory
-function getTargetDir(scope, customPath = null) {
-    if (customPath) {
-        let p = customPath;
-        if (p.startsWith('~')) {
-            const home = getHomedir();
-            if (home) p = p.replace('~', home);
-        }
-        return resolve(p);
-    }
-
-    if (scope === 'global') {
-        const home = getHomedir();
-        if (!home) return null;
-        return join(home, '.claude');
-    }
-
-    return join(process.cwd(), '.claude');
-}
-
-// Validate directory is accessible
 function validatePath(dirPath) {
     try {
         const parentDir = dirname(dirPath);
@@ -83,7 +73,6 @@ function validatePath(dirPath) {
     }
 }
 
-// Recursively copy directory
 function copyDir(src, dest) {
     if (!existsSync(dest)) {
         mkdirSync(dest, { recursive: true });
@@ -108,7 +97,6 @@ function copyDir(src, dest) {
     return copied;
 }
 
-// Count files in directory
 function countFiles(dir) {
     if (!existsSync(dir)) return 0;
     let count = 0;
@@ -120,19 +108,24 @@ function countFiles(dir) {
     return count;
 }
 
-// Count directories
 function countDirs(dir) {
     if (!existsSync(dir)) return 0;
     return readdirSync(dir).filter(e => statSync(join(dir, e)).isDirectory()).length;
 }
 
-// Prompt helper using readline
+function countFilesFlat(dir, ext = null) {
+    if (!existsSync(dir)) return 0;
+    return readdirSync(dir)
+        .filter(e => {
+            const p = join(dir, e);
+            if (!statSync(p).isFile()) return false;
+            return ext ? e.endsWith(ext) : true;
+        }).length;
+}
+
 function prompt(question) {
     return new Promise((resolve) => {
-        const rl = createInterface({
-            input: process.stdin,
-            output: process.stdout
-        });
+        const rl = createInterface({ input: process.stdin, output: process.stdout });
         rl.question(question, (answer) => {
             rl.close();
             resolve(answer.trim());
@@ -140,7 +133,6 @@ function prompt(question) {
     });
 }
 
-// Interactive menu selection
 async function select(question, options) {
     console.log(`\n  ${c.bold}${question}${c.reset}\n`);
     options.forEach((opt, i) => {
@@ -154,11 +146,9 @@ async function select(question, options) {
     if (idx >= 0 && idx < options.length) {
         return options[idx].value;
     }
-    // Default to first option
     return options[0].value;
 }
 
-// Yes/No prompt
 async function confirm(question, defaultYes = true) {
     const hint = defaultYes ? 'Y/n' : 'y/N';
     const answer = await prompt(`  ${question} (${hint}): `);
@@ -167,512 +157,806 @@ async function confirm(question, defaultYes = true) {
     return answer.toLowerCase().startsWith('y');
 }
 
-// Get hooks configuration object
-function getHooksConfig(scope) {
-    // Use relative paths for project scope, but need absolute for global
-    // Actually, relative paths work from cwd, so they work for both!
-    return {
-        UserPromptSubmit: [{
-            hooks: [{
-                type: "command",
-                command: "node .claude/hooks/on-prompt-submit.cjs",
-                timeout: 5,
-                once: true
-            }]
-        }],
-        Stop: [{
-            hooks: [{
-                type: "command",
-                command: "node .claude/hooks/on-stop.cjs",
-                timeout: 10
-            }]
-        }]
-    };
-}
-
-// Merge hooks into existing settings.json
-function configureHooks(settingsPath, scope) {
-    let settings = {};
-
-    if (existsSync(settingsPath)) {
-        try {
-            settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
-        } catch {
-            // If parse fails, start fresh
-            settings = {};
-        }
-    }
-
-    // Merge hooks config
-    settings.hooks = getHooksConfig(scope);
-
-    // Write back
-    const dir = dirname(settingsPath);
-    if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
-    }
-
-    writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
-    return true;
-}
-
-// Remove hooks from settings.json
-function removeHooksConfig(settingsPath) {
-    if (!existsSync(settingsPath)) return false;
-
-    try {
-        const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
-        if (settings.hooks) {
-            delete settings.hooks;
-            writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
-            return true;
-        }
-    } catch {
-        // Ignore errors
-    }
-    return false;
-}
-
-// Print banner
 function printBanner() {
     console.log(`
   ${c.bold}${c.magenta}codehogg${c.reset} ${c.dim}v${getVersion()}${c.reset}
-  ${c.dim}29 agents ${sym.bullet} 43 skills for Claude Code${c.reset}
+  ${c.dim}29 agents ${sym.bullet} 43 skills for Claude Code, Codex CLI, and OpenCode${c.reset}
 `);
 }
 
-// Interactive install
-async function interactiveInit() {
-    printBanner();
-
-    console.log(`  ${c.cyan}Welcome!${c.reset} Let's set up codehogg for Claude Code.\n`);
-
-    // Step 1: Choose scope
-    const scope = await select('Where would you like to install?', [
-        {
-            value: 'project',
-            label: 'Current project (./.claude/)',
-            desc: 'Best for project-specific customization'
-        },
-        {
-            value: 'global',
-            label: 'Global (~/.claude/)',
-            desc: 'Available in all projects'
-        }
-    ]);
-
-    const targetDir = getTargetDir(scope);
-
-    if (!targetDir) {
-        console.log(`\n  ${c.red}Error:${c.reset} Cannot determine ${scope} directory.`);
-        if (scope === 'global') {
-            console.log(`  ${c.dim}Try: npx codehogg init --path ~/.claude${c.reset}\n`);
-        }
-        process.exit(1);
-    }
-
-    const validation = validatePath(targetDir);
-    if (!validation.valid) {
-        console.log(`\n  ${c.red}Error:${c.reset} ${validation.error}\n`);
-        process.exit(1);
-    }
-
-    // Check for existing installation
-    const hasExisting = existsSync(join(targetDir, 'agents')) ||
-                        existsSync(join(targetDir, 'skills'));
-
-    if (hasExisting) {
-        const overwrite = await confirm(`${c.yellow}${sym.warn}${c.reset} Existing installation found. Overwrite?`, false);
-        if (!overwrite) {
-            console.log(`\n  ${c.dim}Use 'codehogg update' to update existing installation.${c.reset}\n`);
-            process.exit(0);
-        }
-    }
-
-    // Step 2: Hooks
-    console.log(`\n  ${c.bold}Task Tracking Hooks${c.reset}`);
-    console.log(`  ${c.dim}Automatically track tasks in CLAUDE.md:${c.reset}`);
-    console.log(`  ${c.dim}  ${sym.bullet} on-prompt-submit: Adds tasks when you give commands${c.reset}`);
-    console.log(`  ${c.dim}  ${sym.bullet} on-stop: Updates task status when Claude finishes${c.reset}\n`);
-
-    const enableHooks = await confirm('Enable task tracking hooks?', true);
-
-    // Step 3: Install
-    console.log(`\n  ${c.bold}Installing...${c.reset}\n`);
-
-    await doInstall(targetDir, scope, enableHooks, true);
-
-    // Step 4: Success
-    console.log(`\n  ${c.green}${c.bold}Installation complete!${c.reset}\n`);
-
-    console.log(`  ${c.bold}Quick start:${c.reset}`);
-    console.log(`    ${c.cyan}/audit-quick${c.reset}      - Run 7 key consultant agents`);
-    console.log(`    ${c.cyan}/audit-full${c.reset}       - Run all 18 consultant agents`);
-    console.log(`    ${c.cyan}/plan-full${c.reset}        - Full 5-phase planning workflow`);
-    console.log(`    ${c.cyan}/explore-concepts${c.reset} - Generate 3 design directions`);
-    console.log(`\n  ${c.dim}Run /help in Claude Code to see all commands.${c.reset}\n`);
+function yamlQuote(value) {
+    const v = String(value ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    return `"${v}"`;
 }
 
-// Do the actual installation
-async function doInstall(targetDir, scope, enableHooks, showProgress = false) {
-    const sources = {
-        agents: join(TEMPLATES_DIR, 'agents'),
-        skills: join(TEMPLATES_DIR, 'skills'),
-        hooks: join(TEMPLATES_DIR, 'hooks'),           // Loaders (go to target)
-        'hooks-global': join(TEMPLATES_DIR, 'hooks-global'),  // Implementations (always global)
-    };
+function normalizeTools(tools) {
+    const normalized = [];
 
-    const targets = {
-        agents: join(targetDir, 'agents'),
-        skills: join(targetDir, 'skills'),
-        hooks: join(targetDir, 'hooks'),
-    };
+    for (const raw of tools) {
+        if (!raw) continue;
+        const t = String(raw).toLowerCase();
+        const mapped = t === 'claude-code' ? 'claude'
+            : t === 'codex-cli' ? 'codex'
+                : t;
 
-    // Global hooks-global directory (implementations always go here)
-    const globalHooksDir = join(homedir(), '.claude', 'hooks-global');
+        if (!TOOL_IDS.includes(mapped)) {
+            console.error(`\n  ${c.red}Error:${c.reset} Unknown tool '${raw}'.`);
+            console.log(`  Valid tools: ${TOOL_IDS.join(', ')}\n`);
+            process.exit(1);
+        }
 
-    // Create target directory
-    if (!existsSync(targetDir)) {
-        mkdirSync(targetDir, { recursive: true });
+        if (!normalized.includes(mapped)) normalized.push(mapped);
     }
 
-    // Copy agents, skills, and hook loaders to target
-    for (const [name, source] of Object.entries(sources)) {
-        if (!existsSync(source)) continue;
-        if (name === 'hooks-global') continue; // Handle separately
+    return normalized;
+}
 
-        const target = targets[name];
-        if (existsSync(target)) {
-            rmSync(target, { recursive: true, force: true });
+function getRootDirForTool(tool, scope, customPath = null) {
+    if (customPath) {
+        let p = customPath;
+        if (p.startsWith('~')) {
+            const home = getHomedir();
+            if (home) p = p.replace('~', home);
         }
+        return resolve(p);
+    }
 
-        const count = copyDir(source, target);
-        const label = name === 'skills' ? `${countDirs(target)} skills` : `${count} ${name}`;
+    const home = getHomedir();
+    if (!home && scope === 'global') return null;
 
-        if (showProgress) {
-            console.log(`    ${c.green}${sym.check}${c.reset} ${label}`);
+    switch (tool) {
+        case 'claude':
+            return scope === 'global' ? join(home, '.claude') : join(process.cwd(), '.claude');
+        case 'codex':
+            return scope === 'global' ? join(home, '.codex') : join(process.cwd(), '.codex');
+        default:
+            return null;
+    }
+}
+
+function getOpenCodeAgentDir(scope) {
+    const home = getHomedir();
+    if (scope === 'global') {
+        if (!home) return null;
+        return join(home, '.config', 'opencode', 'agent');
+    }
+    return join(process.cwd(), '.opencode', 'agent');
+}
+
+function getOpenCodeAgentRoot(scope) {
+    const home = getHomedir();
+    if (scope === 'global') {
+        if (!home) return null;
+        return join(home, '.config', 'opencode');
+    }
+    return join(process.cwd(), '.opencode');
+}
+
+function ensureDir(p) {
+    if (!existsSync(p)) mkdirSync(p, { recursive: true });
+}
+
+function resetDir(p) {
+    if (existsSync(p)) {
+        rmSync(p, { recursive: true, force: true });
+    }
+    mkdirSync(p, { recursive: true });
+}
+
+function writeTimestamp(dir) {
+    ensureDir(dir);
+    const timestampFile = join(dir, '.codehogg-updated');
+    writeFileSync(timestampFile, new Date().toISOString().split('T')[0]);
+}
+
+function parseClaudeAgentTemplate(agentPath) {
+    const raw = readFileSync(agentPath, 'utf8');
+    const parts = raw.split(/\n---\n/);
+
+    if (!raw.startsWith('---\n') || parts.length < 2) {
+        return { frontmatter: {}, body: raw };
+    }
+
+    const fmText = parts[0].replace(/^---\n/, '');
+    const body = raw.slice(parts[0].length + '\n---\n'.length);
+
+    const fm = {};
+    for (const line of fmText.split('\n')) {
+        const m = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+        if (m) {
+            fm[m[1]] = m[2];
         }
     }
 
-    // Always install hook implementations to global ~/.claude/hooks-global/
-    const hooksGlobalSource = sources['hooks-global'];
-    if (existsSync(hooksGlobalSource)) {
-        if (existsSync(globalHooksDir)) {
-            rmSync(globalHooksDir, { recursive: true, force: true });
-        }
-        const count = copyDir(hooksGlobalSource, globalHooksDir);
-        if (showProgress) {
-            console.log(`    ${c.green}${sym.check}${c.reset} ${count} hook implementations (global)`);
-        }
+    return { frontmatter: fm, body };
+}
+
+function installSkills(destDir, { force, showProgress, label }) {
+    const source = join(TEMPLATES_DIR, 'skills');
+    if (!existsSync(source)) {
+        throw new Error(`Templates missing: ${source}`);
     }
 
-    // Copy CODEHOGG.md
+    if (existsSync(destDir) && !force) {
+        throw new Error(`Existing installation found at ${destDir}. Use --force to overwrite.`);
+    }
+
+    resetDir(destDir);
+    const copied = copyDir(source, destDir);
+
+    if (showProgress) {
+        console.log(`    ${c.green}${sym.check}${c.reset} ${label} (${countDirs(destDir)} skills)`);
+    }
+
+    return copied;
+}
+
+function installClaude(targetDir, { force, showProgress }) {
+    const validation = validatePath(targetDir);
+    if (!validation.valid) {
+        throw new Error(validation.error);
+    }
+
+    ensureDir(targetDir);
+
+    const agentsSource = join(TEMPLATES_DIR, 'agents');
+    const agentsDest = join(targetDir, 'agents');
+
+    if (existsSync(agentsDest) && !force) {
+        throw new Error(`Existing installation found at ${agentsDest}. Use --force to overwrite.`);
+    }
+
+    resetDir(agentsDest);
+    const agentCount = copyDir(agentsSource, agentsDest);
+
+    const skillsDest = join(targetDir, 'skills');
+    installSkills(skillsDest, { force, showProgress, label: 'Claude skills' });
+
     const codehoggSrc = join(TEMPLATES_DIR, 'CODEHOGG.md');
     const codehoggDest = join(targetDir, 'CODEHOGG.md');
     if (existsSync(codehoggSrc)) {
         copyFileSync(codehoggSrc, codehoggDest);
     }
 
-    // Write timestamp
-    const timestampFile = join(targetDir, '.codehogg-updated');
-    writeFileSync(timestampFile, new Date().toISOString().split('T')[0]);
+    writeTimestamp(targetDir);
 
-    // Configure hooks if requested
-    if (enableHooks) {
-        // Determine settings path
-        let settingsPath;
-        if (scope === 'global') {
-            settingsPath = join(targetDir, 'settings.json');
-        } else {
-            // For project scope, use settings.local.json in project .claude/
-            settingsPath = join(targetDir, 'settings.local.json');
+    if (showProgress) {
+        console.log(`    ${c.green}${sym.check}${c.reset} ${agentCount} Claude agents`);
+    }
+
+    return true;
+}
+
+function installCodex(targetDir, { force, showProgress }) {
+    const validation = validatePath(targetDir);
+    if (!validation.valid) {
+        throw new Error(validation.error);
+    }
+
+    ensureDir(targetDir);
+
+    const skillsDest = join(targetDir, 'skills');
+    installSkills(skillsDest, { force, showProgress, label: 'Codex skills' });
+
+    writeTimestamp(targetDir);
+
+    return true;
+}
+
+function installOpenCodeAgents(agentDir, { force, showProgress }) {
+    const sourceDir = join(TEMPLATES_DIR, 'agents');
+    if (!existsSync(sourceDir)) {
+        throw new Error(`Templates missing: ${sourceDir}`);
+    }
+
+    if (existsSync(agentDir) && !force) {
+        throw new Error(`Existing installation found at ${agentDir}. Use --force to overwrite.`);
+    }
+
+    resetDir(agentDir);
+
+    const agentFiles = readdirSync(sourceDir)
+        .filter(f => f.endsWith('.md'))
+        .sort();
+
+    let written = 0;
+    for (const file of agentFiles) {
+        const inputPath = join(sourceDir, file);
+        const { frontmatter, body } = parseClaudeAgentTemplate(inputPath);
+        const description = frontmatter.description || `Codehogg agent: ${file.replace(/\.md$/, '')}`;
+
+        const out = [
+            '---',
+            `description: ${yamlQuote(description)}`,
+            'mode: subagent',
+            'tools:',
+            '  bash: true',
+            '  read: true',
+            '  grep: true',
+            '  glob: true',
+            '  webfetch: true',
+            '  edit: true',
+            '  write: true',
+            '  skill: true',
+            '---',
+            '',
+            body.trimStart(),
+        ].join('\n');
+
+        writeFileSync(join(agentDir, file), out);
+        written++;
+    }
+
+    if (showProgress) {
+        console.log(`    ${c.green}${sym.check}${c.reset} ${written} OpenCode agents`);
+    }
+
+    return written;
+}
+
+function installOpenCode(scope, { force, showProgress }) {
+    // Skills: use OpenCode's Claude-compatible skill lookup.
+    const claudeRoot = getRootDirForTool('claude', scope);
+    if (!claudeRoot) throw new Error('Cannot determine ~/.claude directory.');
+    const validation = validatePath(claudeRoot);
+    if (!validation.valid) {
+        throw new Error(validation.error);
+    }
+
+    ensureDir(claudeRoot);
+    installSkills(join(claudeRoot, 'skills'), { force, showProgress, label: 'OpenCode skills (via .claude/skills)' });
+    writeTimestamp(claudeRoot);
+
+    // Agents: native OpenCode agent path.
+    const agentRoot = getOpenCodeAgentRoot(scope);
+    const agentDir = getOpenCodeAgentDir(scope);
+    if (!agentRoot || !agentDir) throw new Error('Cannot determine OpenCode agent directory.');
+
+    const agentValidation = validatePath(agentRoot);
+    if (!agentValidation.valid) {
+        throw new Error(agentValidation.error);
+    }
+
+    ensureDir(agentRoot);
+    installOpenCodeAgents(agentDir, { force, showProgress });
+    writeTimestamp(agentRoot);
+
+    return true;
+}
+
+function detectInstalled(scope) {
+    const home = getHomedir();
+
+    const claudeRoot = scope === 'global'
+        ? (home ? join(home, '.claude') : null)
+        : join(process.cwd(), '.claude');
+
+    const codexRoot = scope === 'global'
+        ? (home ? join(home, '.codex') : null)
+        : join(process.cwd(), '.codex');
+
+    const opencodeAgentsDir = getOpenCodeAgentDir(scope);
+
+    return {
+        claude: !!claudeRoot && (existsSync(join(claudeRoot, 'agents')) || existsSync(join(claudeRoot, 'skills'))),
+        codex: !!codexRoot && existsSync(join(codexRoot, 'skills')),
+        opencode: !!opencodeAgentsDir && existsSync(opencodeAgentsDir),
+        paths: { claudeRoot, codexRoot, opencodeAgentsDir },
+    };
+}
+
+async function interactiveInit() {
+    printBanner();
+    console.log(`  ${c.cyan}Welcome!${c.reset} Let's set up codehogg.\n`);
+
+    const scope = await select('Where would you like to install?', [
+        { value: 'project', label: 'Current project', desc: 'Installs to .claude/.codex/.opencode in this repo' },
+        { value: 'global', label: 'Global', desc: 'Installs to ~/.claude, ~/.codex, and ~/.config/opencode' },
+    ]);
+
+    console.log(`\n  ${c.bold}Targets${c.reset}`);
+    const installClaudeFlag = await confirm('Install for Claude Code?', true);
+    const installCodexFlag = await confirm('Install for Codex CLI?', false);
+    const installOpenCodeFlag = await confirm('Install for OpenCode?', false);
+
+    const tools = [];
+    if (installClaudeFlag) tools.push('claude');
+    if (installCodexFlag) tools.push('codex');
+    if (installOpenCodeFlag) tools.push('opencode');
+
+    if (tools.length === 0) {
+        console.log(`\n  ${c.dim}No tools selected. Nothing to do.${c.reset}\n`);
+        process.exit(0);
+    }
+
+    const installed = detectInstalled(scope);
+    const existing = tools.filter(t => installed[t]);
+
+    let force = true;
+    if (existing.length > 0) {
+        console.log(`\n  ${c.yellow}${sym.warn}${c.reset} Existing installation(s) detected: ${existing.join(', ')}`);
+        force = await confirm('Overwrite existing installation(s)?', false);
+        if (!force) {
+            console.log(`\n  ${c.dim}Aborted.${c.reset}\n`);
+            process.exit(0);
+        }
+    }
+
+    console.log(`\n  ${c.bold}Installing...${c.reset}\n`);
+
+    doInstall({ scope, tools, force, showProgress: true, customPath: null });
+
+    console.log(`\n  ${c.green}${c.bold}Installation complete!${c.reset}\n`);
+
+    console.log(`  ${c.bold}Quick start:${c.reset}`);
+    if (tools.includes('claude')) {
+        console.log(`    ${c.cyan}Claude Code:${c.reset} /audit-quick, /audit-full, /plan-full`);
+    }
+    if (tools.includes('codex')) {
+        console.log(`    ${c.cyan}Codex CLI:${c.reset} use $audit-quick (or /skills to browse)`);
+    }
+    if (tools.includes('opencode')) {
+        console.log(`    ${c.cyan}OpenCode:${c.reset} use skills (audit-quick) or @architect-consultant`);
+    }
+
+    console.log('');
+}
+
+function doInstall({ scope, tools, force, showProgress, customPath }) {
+    const selected = normalizeTools(tools);
+
+    if (customPath && selected.length !== 1) {
+        throw new Error('Custom --path is only supported when installing a single tool.');
+    }
+
+    for (const tool of selected) {
+        if (tool === 'claude') {
+            const targetDir = getRootDirForTool('claude', scope, customPath);
+            if (!targetDir) throw new Error('Cannot determine .claude directory.');
+            installClaude(targetDir, { force, showProgress });
         }
 
-        configureHooks(settingsPath, scope);
+        if (tool === 'codex') {
+            const targetDir = getRootDirForTool('codex', scope, customPath);
+            if (!targetDir) throw new Error('Cannot determine .codex directory.');
+            installCodex(targetDir, { force, showProgress });
+        }
 
-        if (showProgress) {
-            console.log(`    ${c.green}${sym.check}${c.reset} hooks configured in ${scope === 'global' ? 'settings.json' : 'settings.local.json'}`);
+        if (tool === 'opencode') {
+            if (customPath) {
+                throw new Error('Custom --path is not supported for OpenCode installs.');
+            }
+            installOpenCode(scope, { force, showProgress });
         }
     }
 
     return true;
 }
 
-// Non-interactive init
-function init(scope, force, customPath = null, skipHooks = false) {
-    const targetDir = getTargetDir(scope, customPath);
+function initNonInteractive(scope, force, tools, customPath = null) {
+    const selected = normalizeTools(tools.length ? tools : ['claude']);
 
-    if (!targetDir) {
-        console.error(`\n  ${c.red}Error:${c.reset} Cannot determine installation directory.\n`);
-        if (scope === 'global') {
-            console.log(`  ${c.dim}Try: npx codehogg init --path ~/.claude${c.reset}\n`);
-        }
-        process.exit(1);
-    }
-
-    const validation = validatePath(targetDir);
-    if (!validation.valid) {
-        console.error(`\n  ${c.red}Error:${c.reset} ${validation.error}\n`);
-        process.exit(1);
-    }
-
-    const scopeLabel = customPath ? `custom (${targetDir})` : (scope === 'global' ? 'global (~/.claude/)' : 'project (./.claude/)');
-
+    const scopeLabel = scope === 'global' ? 'global' : 'project';
     console.log(`\n  ${c.bold}codehogg${c.reset} v${getVersion()}`);
-    console.log(`  Installing to ${scopeLabel}\n`);
+    console.log(`  Installing (${scopeLabel}) for: ${selected.join(', ')}\n`);
 
-    // Check for existing
-    const hasExisting = existsSync(join(targetDir, 'agents')) ||
-                        existsSync(join(targetDir, 'skills'));
+    doInstall({ scope, tools: selected, force, showProgress: true, customPath });
 
-    if (hasExisting && !force) {
-        console.log(`  ${c.yellow}${sym.warn}${c.reset} Existing installation detected.`);
-        console.log(`  Use --force to overwrite, or 'codehogg update' to update.\n`);
-        process.exit(1);
-    }
-
-    doInstall(targetDir, scope, !skipHooks, true);
-
-    console.log(`\n  ${c.green}Installation complete!${c.reset}`);
-    console.log(`\n  ${c.dim}Run /help in Claude Code to see all commands.${c.reset}\n`);
+    console.log(`\n  ${c.green}Installation complete!${c.reset}\n`);
 }
 
-// Update command
-function update(scope, customPath = null) {
-    const targetDir = getTargetDir(scope, customPath);
+function update(scope, tools) {
+    const installed = detectInstalled(scope);
+    const selected = normalizeTools(tools.length ? tools : TOOL_IDS.filter(t => installed[t]));
 
-    if (!targetDir || !existsSync(targetDir)) {
-        console.log(`\n  ${c.red}Error:${c.reset} No installation found.`);
+    if (selected.length === 0) {
+        console.log(`\n  ${c.red}Error:${c.reset} No installations found to update.`);
         console.log(`  Run 'codehogg init' first.\n`);
         process.exit(1);
     }
 
     console.log(`\n  ${c.bold}codehogg${c.reset} v${getVersion()}`);
-    console.log(`  Updating ${scope} installation...\n`);
+    console.log(`  Updating ${scope} installation(s): ${selected.join(', ')}\n`);
 
-    // Check if hooks were enabled
-    const settingsPath = scope === 'global'
-        ? join(targetDir, 'settings.json')
-        : join(targetDir, 'settings.local.json');
-
-    let hasHooks = false;
-    if (existsSync(settingsPath)) {
-        try {
-            const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
-            hasHooks = !!settings.hooks;
-        } catch {}
-    }
-
-    doInstall(targetDir, scope, hasHooks, true);
+    doInstall({ scope, tools: selected, force: true, showProgress: true, customPath: null });
 
     console.log(`\n  ${c.green}Update complete!${c.reset}\n`);
 }
 
-// Uninstall command
-function uninstall(scope, customPath = null) {
-    const targetDir = getTargetDir(scope, customPath);
+async function uninstallInteractive(scope) {
+    printBanner();
 
-    if (!targetDir) {
-        console.error(`\n  ${c.red}Error:${c.reset} Cannot determine installation directory.\n`);
-        process.exit(1);
+    const installed = detectInstalled(scope);
+    const candidates = TOOL_IDS.filter(t => installed[t]);
+
+    if (candidates.length === 0) {
+        console.log(`\n  ${c.dim}Nothing to uninstall.${c.reset}\n`);
+        process.exit(0);
     }
 
+    console.log(`  ${c.bold}Installed:${c.reset} ${candidates.join(', ')}\n`);
+
+    const removeClaude = candidates.includes('claude')
+        ? await confirm('Uninstall Claude Code assets?', true)
+        : false;
+    const removeCodex = candidates.includes('codex')
+        ? await confirm('Uninstall Codex CLI assets?', true)
+        : false;
+    const removeOpenCode = candidates.includes('opencode')
+        ? await confirm('Uninstall OpenCode assets?', true)
+        : false;
+
+    const selected = [];
+    if (removeClaude) selected.push('claude');
+    if (removeCodex) selected.push('codex');
+    if (removeOpenCode) selected.push('opencode');
+
+    if (selected.length === 0) {
+        console.log(`\n  ${c.dim}Nothing selected. Aborted.${c.reset}\n`);
+        process.exit(0);
+    }
+
+    const ok = await confirm(`${c.yellow}${sym.warn}${c.reset} This will remove files from disk. Continue?`, false);
+    if (!ok) {
+        console.log(`\n  ${c.dim}Aborted.${c.reset}\n`);
+        process.exit(0);
+    }
+
+    uninstall(scope, selected);
+}
+
+function uninstall(scope, tools) {
+    const selected = normalizeTools(tools);
+    const home = getHomedir();
+
+    const claudeRoot = scope === 'global'
+        ? (home ? join(home, '.claude') : null)
+        : join(process.cwd(), '.claude');
+
+    const codexRoot = scope === 'global'
+        ? (home ? join(home, '.codex') : null)
+        : join(process.cwd(), '.codex');
+
+    const opencodeRoot = getOpenCodeAgentRoot(scope);
+    const opencodeAgentsDir = getOpenCodeAgentDir(scope);
+
+    const keepingClaudeSkills =
+        (selected.includes('claude') && !selected.includes('opencode') && opencodeAgentsDir && existsSync(opencodeAgentsDir)) ||
+        (selected.includes('opencode') && !selected.includes('claude') && claudeRoot && existsSync(join(claudeRoot, 'agents')));
+
     console.log(`\n  ${c.bold}codehogg${c.reset} v${getVersion()}`);
-    console.log(`  Uninstalling from ${scope}...\n`);
+    console.log(`  Uninstalling (${scope}) for: ${selected.join(', ')}\n`);
 
     let removed = false;
 
-    const dirs = ['agents', 'skills', 'hooks'];
-    for (const dir of dirs) {
-        const p = join(targetDir, dir);
-        if (existsSync(p)) {
-            rmSync(p, { recursive: true, force: true });
-            console.log(`    ${c.green}${sym.check}${c.reset} Removed ${dir}/`);
+    if (selected.includes('claude') && claudeRoot) {
+        const agentsDir = join(claudeRoot, 'agents');
+        if (existsSync(agentsDir)) {
+            rmSync(agentsDir, { recursive: true, force: true });
+            console.log(`    ${c.green}${sym.check}${c.reset} Removed .claude/agents/`);
+            removed = true;
+        }
+
+        if (!keepingClaudeSkills) {
+            const skillsDir = join(claudeRoot, 'skills');
+            if (existsSync(skillsDir)) {
+                rmSync(skillsDir, { recursive: true, force: true });
+                console.log(`    ${c.green}${sym.check}${c.reset} Removed .claude/skills/`);
+                removed = true;
+            }
+        } else {
+            console.log(`    ${c.dim}Keeping .claude/skills/ (shared with other tool)${c.reset}`);
+        }
+
+        for (const file of ['CODEHOGG.md', '.codehogg-updated']) {
+            const p = join(claudeRoot, file);
+            if (existsSync(p)) {
+                rmSync(p);
+                removed = true;
+            }
+        }
+    }
+
+    if (selected.includes('codex') && codexRoot) {
+        const skillsDir = join(codexRoot, 'skills');
+        if (existsSync(skillsDir)) {
+            rmSync(skillsDir, { recursive: true, force: true });
+            console.log(`    ${c.green}${sym.check}${c.reset} Removed .codex/skills/`);
+            removed = true;
+        }
+        const ts = join(codexRoot, '.codehogg-updated');
+        if (existsSync(ts)) {
+            rmSync(ts);
             removed = true;
         }
     }
 
-    // Clean up files
-    for (const file of ['CODEHOGG.md', '.codehogg-updated']) {
-        const p = join(targetDir, file);
-        if (existsSync(p)) {
-            rmSync(p);
+    if (selected.includes('opencode')) {
+        if (opencodeAgentsDir && existsSync(opencodeAgentsDir)) {
+            rmSync(opencodeAgentsDir, { recursive: true, force: true });
+            console.log(`    ${c.green}${sym.check}${c.reset} Removed .opencode/agent/`);
             removed = true;
         }
-    }
 
-    // Remove hooks from settings
-    const settingsPath = scope === 'global'
-        ? join(targetDir, 'settings.json')
-        : join(targetDir, 'settings.local.json');
+        if (opencodeRoot) {
+            const ts = join(opencodeRoot, '.codehogg-updated');
+            if (existsSync(ts)) {
+                rmSync(ts);
+                removed = true;
+            }
+        }
 
-    if (removeHooksConfig(settingsPath)) {
-        console.log(`    ${c.green}${sym.check}${c.reset} Removed hooks from settings`);
+        if (!keepingClaudeSkills && claudeRoot) {
+            // If OpenCode was installed without Claude, its skills live in .claude/skills.
+            const skillsDir = join(claudeRoot, 'skills');
+            if (existsSync(skillsDir) && !existsSync(join(claudeRoot, 'agents'))) {
+                rmSync(skillsDir, { recursive: true, force: true });
+                console.log(`    ${c.green}${sym.check}${c.reset} Removed .claude/skills/ (OpenCode skill path)`);
+                removed = true;
+            }
+        }
     }
 
     if (removed) {
         console.log(`\n  ${c.green}Uninstall complete.${c.reset}\n`);
     } else {
-        console.log(`  Nothing to uninstall.\n`);
+        console.log(`\n  ${c.dim}Nothing to uninstall.${c.reset}\n`);
     }
 }
 
-// Status command
 function status(customPath = null) {
     console.log(`\n  ${c.bold}codehogg${c.reset} v${getVersion()}\n`);
 
-    const showScope = (label, dir) => {
-        if (!dir) {
-            console.log(`  ${label}: ${c.dim}Unable to determine directory${c.reset}`);
-            return;
-        }
+    const home = getHomedir();
 
-        const agents = countFiles(join(dir, 'agents'));
-        const skills = countDirs(join(dir, 'skills'));
-        const hooks = countFiles(join(dir, 'hooks'));
+    const showClaude = (label, root) => {
+        const agents = countFiles(join(root, 'agents'));
+        const skills = countDirs(join(root, 'skills'));
 
         console.log(`  ${label}:`);
         if (agents > 0 || skills > 0) {
-            console.log(`    ${c.green}${sym.check}${c.reset} ${agents} agents, ${skills} skills, ${hooks} hooks`);
+            console.log(`    ${c.green}${sym.check}${c.reset} ${agents} agents, ${skills} skills`);
+        } else {
+            console.log(`    ${c.dim}Not installed${c.reset}`);
+        }
+    };
 
-            // Check hooks config
-            const settingsPath = label.includes('Global')
-                ? join(dir, 'settings.json')
-                : join(dir, 'settings.local.json');
+    const showCodex = (label, root) => {
+        const skills = countDirs(join(root, 'skills'));
+        console.log(`  ${label}:`);
+        if (skills > 0) {
+            console.log(`    ${c.green}${sym.check}${c.reset} ${skills} skills`);
+        } else {
+            console.log(`    ${c.dim}Not installed${c.reset}`);
+        }
+    };
 
-            if (existsSync(settingsPath)) {
-                try {
-                    const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
-                    if (settings.hooks) {
-                        console.log(`    ${c.green}${sym.check}${c.reset} Hooks enabled`);
-                    }
-                } catch {}
-            }
+    const showOpenCode = (label, agentsDir, claudeSkillsDir) => {
+        const agents = countFilesFlat(agentsDir, '.md');
+        const skills = countDirs(claudeSkillsDir);
+        console.log(`  ${label}:`);
+        if (agents > 0 || skills > 0) {
+            console.log(`    ${c.green}${sym.check}${c.reset} ${agents} agents, ${skills} skills (via .claude/skills)`);
         } else {
             console.log(`    ${c.dim}Not installed${c.reset}`);
         }
     };
 
     if (customPath) {
-        showScope(`Custom (${customPath})`, getTargetDir('project', customPath));
-    } else {
-        showScope('Project (./.claude/)', getTargetDir('project'));
+        const root = getRootDirForTool('claude', 'project', customPath);
+        if (!root) {
+            console.log(`  Custom (${customPath}): ${c.dim}Unable to determine directory${c.reset}`);
+            console.log('');
+            return;
+        }
+        showClaude(`Custom (.claude-like) (${customPath})`, root);
         console.log('');
-        showScope('Global (~/.claude/)', getTargetDir('global'));
+        return;
+    }
+
+    // Project
+    console.log(`  ${c.bold}Project${c.reset}`);
+    showClaude('Claude Code (.claude/)', join(process.cwd(), '.claude'));
+    showCodex('Codex CLI (.codex/)', join(process.cwd(), '.codex'));
+    showOpenCode('OpenCode (.opencode/)', join(process.cwd(), '.opencode', 'agent'), join(process.cwd(), '.claude', 'skills'));
+
+    console.log('');
+
+    // Global
+    if (home) {
+        console.log(`  ${c.bold}Global${c.reset}`);
+        showClaude('Claude Code (~/.claude/)', join(home, '.claude'));
+        showCodex('Codex CLI (~/.codex/)', join(home, '.codex'));
+        showOpenCode('OpenCode (~/.config/opencode/)', join(home, '.config', 'opencode', 'agent'), join(home, '.claude', 'skills'));
     }
 
     console.log('');
 }
 
-// Help
 function showHelp() {
     console.log(`
   ${c.bold}codehogg${c.reset} v${getVersion()}
 
-  ${c.dim}29 agents with 43 skills for Claude Code.${c.reset}
+  ${c.dim}29 agents with 43 skills for Claude Code, Codex CLI, and OpenCode.${c.reset}
 
   ${c.bold}Usage:${c.reset}
     codehogg [command] [options]
 
   ${c.bold}Commands:${c.reset}
     ${c.cyan}init${c.reset}              Interactive installation wizard
-    ${c.cyan}init --global${c.reset}     Install globally (~/.claude/)
-    ${c.cyan}init --local${c.reset}      Install to current project (./.claude/)
-    ${c.cyan}update${c.reset}            Update project installation
-    ${c.cyan}update --global${c.reset}   Update global installation
-    ${c.cyan}uninstall${c.reset}         Remove from project
+    ${c.cyan}update${c.reset}            Update installations (defaults to what's installed)
+    ${c.cyan}uninstall${c.reset}         Remove installations (interactive by default)
     ${c.cyan}status${c.reset}            Show installation status
     ${c.cyan}help${c.reset}              Show this help
 
   ${c.bold}Options:${c.reset}
-    --global, -g      Target global ~/.claude/
-    --local, -l       Target project ./.claude/ (non-interactive)
+    --global, -g      Target global install locations
+    --local, -l       Target current project install locations
     --force, -f       Overwrite existing installation
-    --no-hooks        Skip hooks configuration
-    --path <dir>      Install to custom directory
+    --tool <name>     Install/update/uninstall for a tool (repeatable)
+    --claude          Alias for --tool claude
+    --codex           Alias for --tool codex
+    --opencode        Alias for --tool opencode
+    --path <dir>      Custom directory (single-tool installs only)
+    --version, -v     Show version
+    --help, -h        Show this help
 
   ${c.bold}Examples:${c.reset}
-    npx codehogg init              ${c.dim}# Interactive wizard${c.reset}
-    npx codehogg init -g           ${c.dim}# Quick global install${c.reset}
-    npx codehogg init -l           ${c.dim}# Quick project install${c.reset}
-    npx codehogg update -g         ${c.dim}# Update global installation${c.reset}
-
-  ${c.bold}After installation:${c.reset}
-    /audit-full       ${c.dim}Run all 18 consultant agents${c.reset}
-    /audit-quick      ${c.dim}Run 7 key consultant agents${c.reset}
-    /plan-full        ${c.dim}Full 5-phase planning workflow${c.reset}
-    /explore-concepts ${c.dim}Generate 3 design directions${c.reset}
+    npx codehogg init
+    npx codehogg init --tool codex
+    npx codehogg init --claude --codex
+    npx codehogg update --global
+    npx codehogg uninstall --tool opencode
 `);
 }
 
-// Parse arguments
 function parseArgs(args) {
-    return {
-        command: args.find(a => !a.startsWith('-')) || null,
-        global: args.includes('--global') || args.includes('-g'),
-        local: args.includes('--local') || args.includes('-l'),
-        force: args.includes('--force') || args.includes('-f'),
-        noHooks: args.includes('--no-hooks'),
-        path: (() => {
-            const idx = args.indexOf('--path');
-            return idx !== -1 ? args[idx + 1] : null;
-        })(),
+    const opts = {
+        command: null,
+        global: false,
+        local: false,
+        force: false,
+        path: null,
+        tools: [],
     };
+
+    for (let i = 0; i < args.length; i++) {
+        const a = args[i];
+
+        if (a === '--help' || a === '-h') {
+            opts.command = 'help';
+            continue;
+        }
+
+        if (a === '--version' || a === '-v') {
+            opts.command = 'version';
+            continue;
+        }
+
+        if (a === '--global' || a === '-g') {
+            opts.global = true;
+            continue;
+        }
+
+        if (a === '--local' || a === '-l') {
+            opts.local = true;
+            continue;
+        }
+
+        if (a === '--force' || a === '-f') {
+            opts.force = true;
+            continue;
+        }
+
+        if (a === '--path') {
+            opts.path = args[i + 1] ?? null;
+            i++;
+            continue;
+        }
+
+        if (a === '--tool') {
+            opts.tools.push(args[i + 1] ?? null);
+            i++;
+            continue;
+        }
+
+        if (a === '--claude') {
+            opts.tools.push('claude');
+            continue;
+        }
+
+        if (a === '--codex') {
+            opts.tools.push('codex');
+            continue;
+        }
+
+        if (a === '--opencode') {
+            opts.tools.push('opencode');
+            continue;
+        }
+
+        if (a.startsWith('-')) {
+            continue;
+        }
+
+        if (!opts.command) {
+            opts.command = a;
+        }
+    }
+
+    return opts;
 }
 
-// Main entry point
 export async function run(args) {
     const opts = parseArgs(args);
+    const scope = opts.global ? 'global' : 'project';
 
     switch (opts.command) {
-        case 'init':
-            if (opts.global || opts.local || opts.path) {
-                // Non-interactive mode
-                const scope = opts.global ? 'global' : 'project';
-                init(scope, opts.force, opts.path, opts.noHooks);
+        case 'init': {
+            const nonInteractive = opts.global || opts.local || opts.force || opts.path || opts.tools.length > 0;
+            if (nonInteractive) {
+                initNonInteractive(scope, opts.force, opts.tools, opts.path);
             } else {
-                // Interactive mode
                 await interactiveInit();
             }
             break;
+        }
 
-        case 'update':
-            update(opts.global ? 'global' : 'project', opts.path);
+        case 'update': {
+            update(scope, opts.tools);
             break;
+        }
 
         case 'uninstall':
-        case 'remove':
-            uninstall(opts.global ? 'global' : 'project', opts.path);
+        case 'remove': {
+            if (opts.tools.length > 0) {
+                uninstall(scope, opts.tools);
+            } else if (process.stdout.isTTY) {
+                await uninstallInteractive(scope);
+            } else {
+                console.log(`\n  ${c.red}Error:${c.reset} uninstall requires --tool when not running interactively.\n`);
+                process.exit(1);
+            }
             break;
+        }
 
-        case 'status':
+        case 'status': {
             status(opts.path);
             break;
+        }
 
         case 'version':
         case '-v':
-        case '--version':
+        case '--version': {
             console.log(getVersion());
             break;
+        }
 
         case 'help':
         case '--help':
-        case '-h':
+        case '-h': {
             showHelp();
             break;
+        }
 
-        case null:
-            // No command - show interactive or help
-            if (process.stdout.isTTY) {
+        case null: {
+            const wantsInit = opts.global || opts.local || opts.force || opts.path || opts.tools.length > 0;
+
+            if (wantsInit) {
+                initNonInteractive(scope, opts.force, opts.tools, opts.path);
+            } else if (process.stdout.isTTY) {
                 await interactiveInit();
             } else {
                 showHelp();
             }
-            break;
 
-        default:
+            break;
+        }
+
+        default: {
             console.log(`\n  ${c.red}Unknown command:${c.reset} ${opts.command}`);
             console.log(`  Run 'codehogg help' for usage.\n`);
             process.exit(1);
+        }
     }
 }

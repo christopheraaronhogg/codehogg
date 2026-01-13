@@ -1,4 +1,6 @@
----name: test-ux-personadescription: 🎭 Single Persona Test - Run a specific persona with a custom task against your application
+---
+name: test-ux-persona
+description: 🎭 Single Persona Test - Run a specific persona with a custom task against your application
 ---
 
 # Single Persona UX Test

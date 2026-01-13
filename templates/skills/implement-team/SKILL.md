@@ -1,4 +1,6 @@
----name: implement-teamdescription: 👥 Implement Team - Selective delegation for independent tasks (use carefully)
+---
+name: implement-team
+description: 👥 Implement Team - Selective delegation for independent tasks (use carefully)
 ---
 
 # Implement Team

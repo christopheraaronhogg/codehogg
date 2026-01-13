@@ -1,3 +1,8 @@
+---
+name: audit-integration
+description: Synthesize multiple audit reports into a prioritized remediation roadmap
+---
+
 # Audit Integration Skill
 
 A methodology for synthesizing findings from multiple domain-specific audits into a coherent, actionable remediation roadmap.

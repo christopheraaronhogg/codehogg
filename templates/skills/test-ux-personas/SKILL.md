@@ -1,4 +1,6 @@
----name: test-ux-personasdescription: 🧪 UX Personas Test - Run simulated user research with 6 diverse personas attempting real tasks in your running application
+---
+name: test-ux-personas
+description: 🧪 UX Personas Test - Run simulated user research with 6 diverse personas attempting real tasks in your running application
 ---
 
 # UX Personas Testing

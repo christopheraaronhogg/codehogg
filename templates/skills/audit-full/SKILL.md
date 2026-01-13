@@ -1,4 +1,6 @@
----name: audit-fulldescription: 🚀 ULTRATHINK Enterprise Audit - All 18 consultants in 4 bundle-aligned waves for comprehensive codebase analysis
+---
+name: audit-full
+description: 🚀 ULTRATHINK Enterprise Audit - All 18 consultants in 4 bundle-aligned waves for comprehensive codebase analysis
 ---
 
 # Full Enterprise Audit (Batched by Bundle)

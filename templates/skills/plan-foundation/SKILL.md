@@ -1,4 +1,6 @@
----name: plan-foundationdescription: 🏗️ ULTRATHINK Foundation Planning - Product, Architecture, Code Standards (3 consultants)
+---
+name: plan-foundation
+description: 🏗️ ULTRATHINK Foundation Planning - Product, Architecture, Code Standards (3 consultants)
 ---
 
 # Foundation Planning (3 Consultants)

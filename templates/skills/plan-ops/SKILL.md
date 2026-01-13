@@ -1,4 +1,6 @@
----name: plan-opsdescription: 🚀 ULTRATHINK Ops Planning - DevOps, Cost, Docs, QA, Observability (5 consultants)
+---
+name: plan-ops
+description: 🚀 ULTRATHINK Ops Planning - DevOps, Cost, Docs, QA, Observability (5 consultants)
 ---
 
 # Operations Planning (5 Consultants)

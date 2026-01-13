@@ -1,4 +1,5 @@
 ---
+name: audit-ops
 description: 🔧 ULTRATHINK Operations Audit - DevOps, Cost, Docs, QA, Observability (5 consultants in parallel)
 ---
 

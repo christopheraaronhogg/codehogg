@@ -1,4 +1,6 @@
----name: audit-customdescription: 🎛️ ULTRATHINK Custom Audit - Pick specific consultant domains to run in parallel
+---
+name: audit-custom
+description: 🎛️ ULTRATHINK Custom Audit - Pick specific consultant domains to run in parallel
 ---
 
 # Custom Audit

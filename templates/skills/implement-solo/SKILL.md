@@ -1,4 +1,6 @@
----name: implement-solodescription: 🎯 Implement Solo - Main agent implements PRD sequentially (recommended)
+---
+name: implement-solo
+description: 🎯 Implement Solo - Main agent implements PRD sequentially (recommended)
 ---
 
 # Implement Solo
