@@ -2,6 +2,26 @@
 
 Automated task lifecycle management for Claude Code.
 
+## Architecture
+
+Codehogg uses a **loader pattern** for cross-platform compatibility:
+
+```
+~/.claude/hooks-global/          # Implementations (single source of truth)
+├── on-stop.cjs                  # Full task tracking logic
+└── on-prompt-submit.cjs         # Full prompt detection logic
+
+project/.claude/hooks/           # Loaders (tiny, project-local)
+├── on-stop.cjs                  # require(~/.claude/hooks-global/on-stop.cjs)
+└── on-prompt-submit.cjs         # require(~/.claude/hooks-global/on-prompt-submit.cjs)
+```
+
+**Why loaders?**
+- Single source of truth: Update implementations once, all projects get the update
+- Cross-platform: Uses `os.homedir()` and `path.join()` for Windows/macOS/Linux
+- No symlinks: Avoids Windows admin/developer mode requirements
+- Git-friendly: Loaders can be committed, implementations stay global
+
 ## Hooks Included
 
 ### `on-prompt-submit.cjs`
@@ -30,7 +50,16 @@ When Claude finishes responding:
 
 ## Installation
 
-After running `npx codehogg init`, add this to your `.claude/settings.json` or `~/.claude/settings.json`:
+Run `npx codehogg init` to install both loaders and implementations automatically.
+
+The CLI will:
+1. Copy loaders to your target directory (project or global)
+2. Copy implementations to `~/.claude/hooks-global/` (always global)
+3. Configure hooks in settings.json
+
+## Manual Configuration
+
+If you need to manually configure hooks, add this to your `.claude/settings.json` or `~/.claude/settings.json`:
 
 ```json
 {
@@ -62,8 +91,8 @@ After running `npx codehogg init`, add this to your `.claude/settings.json` or `
 }
 ```
 
-**Note:** Uses relative paths (`.claude/hooks/...`) which work on Windows, macOS, and Linux.
+**Note:** Uses relative paths (`.claude/hooks/...`) which work from any project directory.
 
 ## Debugging
 
-Set `DEBUG_HOOK=1` environment variable to enable verbose logging.
+Set `DEBUG_HOOK=1` environment variable to enable verbose logging in the implementation files.

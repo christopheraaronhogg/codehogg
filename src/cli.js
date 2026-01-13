@@ -318,7 +318,8 @@ async function doInstall(targetDir, scope, enableHooks, showProgress = false) {
     const sources = {
         agents: join(TEMPLATES_DIR, 'agents'),
         skills: join(TEMPLATES_DIR, 'skills'),
-        hooks: join(TEMPLATES_DIR, 'hooks'),
+        hooks: join(TEMPLATES_DIR, 'hooks'),           // Loaders (go to target)
+        'hooks-global': join(TEMPLATES_DIR, 'hooks-global'),  // Implementations (always global)
     };
 
     const targets = {
@@ -327,14 +328,18 @@ async function doInstall(targetDir, scope, enableHooks, showProgress = false) {
         hooks: join(targetDir, 'hooks'),
     };
 
+    // Global hooks-global directory (implementations always go here)
+    const globalHooksDir = join(homedir(), '.claude', 'hooks-global');
+
     // Create target directory
     if (!existsSync(targetDir)) {
         mkdirSync(targetDir, { recursive: true });
     }
 
-    // Copy each component
+    // Copy agents, skills, and hook loaders to target
     for (const [name, source] of Object.entries(sources)) {
         if (!existsSync(source)) continue;
+        if (name === 'hooks-global') continue; // Handle separately
 
         const target = targets[name];
         if (existsSync(target)) {
@@ -346,6 +351,18 @@ async function doInstall(targetDir, scope, enableHooks, showProgress = false) {
 
         if (showProgress) {
             console.log(`    ${c.green}${sym.check}${c.reset} ${label}`);
+        }
+    }
+
+    // Always install hook implementations to global ~/.claude/hooks-global/
+    const hooksGlobalSource = sources['hooks-global'];
+    if (existsSync(hooksGlobalSource)) {
+        if (existsSync(globalHooksDir)) {
+            rmSync(globalHooksDir, { recursive: true, force: true });
+        }
+        const count = copyDir(hooksGlobalSource, globalHooksDir);
+        if (showProgress) {
+            console.log(`    ${c.green}${sym.check}${c.reset} ${count} hook implementations (global)`);
         }
     }
 
