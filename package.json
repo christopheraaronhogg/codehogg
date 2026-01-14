@@ -1,6 +1,6 @@
 {
   "name": "codehogg",
-  "version": "5.1.0",
+  "version": "5.1.1",
   "description": "9 agents + 21 skills for Claude Code, Codex CLI, and OpenCode. Vision-driven development with Masterbuilder + Artisans coordination.",
   "author": "Christopher Hogg",
   "license": "MIT",

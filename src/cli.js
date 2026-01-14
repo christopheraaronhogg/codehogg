@@ -14,10 +14,7 @@ import {
 } from 'fs';
 import { homedir, platform } from 'os';
 import { createInterface } from 'readline';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
-const updateNotifier = require('update-notifier');
+import updateNotifier from 'update-notifier';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
