@@ -1,8 +1,8 @@
 # codehogg
 
-**17 agents + 45 skills for Claude Code, Codex CLI, and OpenCode.**
+**9 agents + 46 skills for Claude Code, Codex CLI, and OpenCode.**
 
-Vision-driven development with Masterbuilder + Artisans coordination, comprehensive codebase audits, feature planning, UX persona testing, and implementation guidance.
+Vision-driven development with Masterbuilder + Artisans coordination. The Masterbuilder reads your VISION.md, consults domain artisans for counsel, creates plans for your approval, delegates execution, and verifies results.
 
 > "And the LORD answered me, and said, Write the vision, and make it plain upon tables, that he may run that readeth it."
 > — Habakkuk 2:2 (KJV)
@@ -117,16 +117,15 @@ codehogg ships **agents + skills**, installed into tool-specific folders:
 # (OpenCode skills are loaded from .claude/skills)
 ```
 
-### Agents (17)
+### Agents (9)
 
-Specialized workers that run in their own context window. Each agent:
-- Has a focused persona and expertise
+The Masterbuilder + 8 domain Artisans. Each agent:
+- Runs in its own context window (isolated from main conversation)
 - Uses Opus model for deep analysis
 - Has restricted tool access appropriate to their role
 - References skills for domain knowledge
-- Can be proactively triggered by Claude when relevant
 
-### Skills (45)
+### Skills (46)
 
 Domain knowledge that Claude loads automatically when your request matches the skill's description. Skills contain:
 - Evaluation frameworks and methodologies
@@ -165,24 +164,6 @@ The core 2-tier architecture for vision-driven development:
 | qa-artisan | Testing, quality, reliability |
 | product-artisan | Requirements, scope, documentation |
 
-### UX Persona Agents (7)
-
-| Agent | Simulates | Focus |
-|-------|-----------|-------|
-| ux-personas-orchestrator | Research coordinator | Spawns & synthesizes all personas |
-| ux-persona-sarah | Small business owner | Mobile, discovery, pricing |
-| ux-persona-mike | Experienced decorator | Desktop, comparison, quality |
-| ux-persona-jenny | Rush order handler | Desktop, speed, efficiency |
-| ux-persona-carlos | Mobile-first user | Mobile, status checks |
-| ux-persona-david | Accessibility user | Keyboard only, a11y |
-| ux-persona-patricia | Skeptical shopper | Desktop, trust verification |
-
-### Creative Agent (1)
-
-| Agent | Purpose | Model |
-|-------|---------|-------|
-| explore-concepts | Generate 3 distinct design directions using physical metaphors | Opus |
-
 ## Commands
 
 ### Audit Commands
@@ -214,23 +195,6 @@ Plan new features with interview → PRD → roundtable → detailed plans:
 | `/plan-security` | Security-focused planning |
 | ... | (domain-specific planning commands) |
 
-### UX Persona Testing Commands
-
-Simulate real user research with browser-based persona agents:
-
-| Command | Description |
-|---------|-------------|
-| `/test-ux-personas` | Full suite: 6 personas attempting real tasks |
-| `/test-ux-persona {name}` | Single persona with custom task |
-| `/test-ux-quick` | Fast smoke test: 2 key personas |
-| `/test-ux-a11y` | Deep accessibility testing with keyboard-only user |
-
-### Creative Commands
-
-| Command | Description |
-|---------|-------------|
-| `/explore-concepts` | Generate 3 distinct implementation directions |
-
 ### Implementation Commands
 
 | Command | Description |
@@ -238,18 +202,9 @@ Simulate real user research with browser-based persona agents:
 | `/implement-solo` | Main agent implements from plan |
 | `/implement-team` | Parallel delegation for independent tasks |
 
-## UX Persona Testing
+## User Testing
 
-A unique feature: **simulated user research** using Claude's browser capabilities.
-
-### How It Works
-
-Instead of traditional automated tests, codehogg spawns intelligent agents that:
-1. **Embody a specific user persona** (tech level, patience, goals)
-2. **Open a real browser** with appropriate viewport
-3. **Attempt real tasks** as that persona would
-4. **Document friction** with screenshots and judgment
-5. **Report findings** including emotional experience
+After implementation, the Masterbuilder can conduct user testing using the `user-testing` skill. Artisans embody user personas to verify the work from real-world perspectives.
 
 ### The Personas
 
@@ -262,40 +217,14 @@ Instead of traditional automated tests, codehogg spawns intelligent agents that:
 | David | Accessibility user | Keyboard | High | "Can I use this?" |
 | Patricia | Skeptical shopper | Desktop | High | "Is this legit?" |
 
-### Example Output
+### How It Works
 
-```markdown
-## UX Personas Test Results
+1. Masterbuilder identifies what needs testing
+2. Assigns personas to artisans (e.g., frontend-artisan → Sarah)
+3. Each artisan tests from their domain expertise + persona perspective
+4. Masterbuilder synthesizes findings and recommends ship/fix
 
-| Persona | Task | Result | Time | Friction |
-|---------|------|--------|------|----------|
-| Sarah | Sign up | ❌ Failed | 3:42 | High |
-| Mike | Compare | ✅ Success | 2:15 | Low |
-| Jenny | Rush order | ✅ Success | 4:58 | Medium |
-| Carlos | Check status | ❌ Failed | - | Critical |
-| David | Keyboard nav | ❌ Failed | - | Critical |
-| Patricia | Trust check | ✅ Success | 8:30 | Medium |
-
-**Success Rate:** 50% (3 of 6 completed tasks)
-
-**Critical Finding:** Mobile users can't find order status
-```
-
-### Running Persona Tests
-
-```bash
-# Full suite (6 personas, ~20 minutes)
-/test-ux-personas --url http://localhost:3000
-
-# Quick smoke test (2 personas, ~5 minutes)
-/test-ux-quick --url http://localhost:3000
-
-# Single persona with custom task
-/test-ux-persona sarah --url http://localhost:3000 --task "find pricing and sign up"
-
-# Accessibility deep-dive
-/test-ux-a11y --url http://localhost:3000
-```
+This combines domain expertise with user empathy — no separate agents needed.
 
 ## Feature Planning
 
@@ -416,18 +345,6 @@ planning-docs/{feature-slug}/
 └── 99-implementation-plan.md   # Final sequenced plan
 ```
 
-### UX Persona Reports
-
-```
-audit-reports/ux-personas-{timestamp}/
-├── 00-executive-summary.md
-├── 01-sarah-small-business-owner.md
-├── 02-mike-experienced-decorator.md
-├── ...
-├── screenshots/
-└── 99-prioritized-recommendations.md
-```
-
 ## Project Integration
 
 For best results, your project should include:
@@ -506,23 +423,6 @@ Or for faster planning:
 ```
 /plan-quick "user authentication with OAuth"
 ```
-
-### Generate UI Options
-
-```
-/explore-concepts "admin dashboard for order analytics"
-```
-Get 3 distinct directions with physical metaphors:
-- Industrial Command Center (dense, dark, monospace)
-- Editorial Magazine (whitespace, serif, storytelling)
-- Playful Mosaic (bento grid, animations, discovery)
-
-### Test Real User Experience
-
-```
-/test-ux-personas --url http://localhost:3000
-```
-Get feedback from 6 simulated users with different needs, devices, and patience levels.
 
 ## License
 

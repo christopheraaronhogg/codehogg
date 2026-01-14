@@ -2,7 +2,7 @@
 
 ## Repo Overview
 
-codehogg is an npm package that installs **17 agents** and **45 skills** into tool-specific folders:
+codehogg is an npm package that installs **9 agents** and **46 skills** into tool-specific folders:
 
 - **Claude Code**: installs to `.claude/` (agents + skills)
 - **Codex CLI**: installs to `.codex/skills/`
