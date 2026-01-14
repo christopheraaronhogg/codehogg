@@ -220,6 +220,197 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// ASCII Art Avatars for the team
+const AVATARS = {
+    masterbuilder: `
+       ${c.yellow}___________${c.reset}
+      ${c.yellow}/           \\${c.reset}
+     ${c.yellow}|  ${c.bold}◈     ◈${c.reset}${c.yellow}  |${c.reset}
+     ${c.yellow}|     ${c.bold}▽${c.reset}${c.yellow}     |${c.reset}
+     ${c.yellow}|   ${c.bold}═════${c.reset}${c.yellow}   |${c.reset}
+      ${c.yellow}\\  ${c.dim}PLAN${c.reset}${c.yellow}  /${c.reset}
+       ${c.yellow}╔═══════╗${c.reset}
+       ${c.yellow}║${c.dim}VISION${c.reset}${c.yellow}║${c.reset}
+       ${c.yellow}╚═══════╝${c.reset}`,
+
+    security: `
+       ${c.red}╔═══════╗${c.reset}
+       ${c.red}║${c.bold}  ◉ ◉  ${c.reset}${c.red}║${c.reset}
+       ${c.red}║   ${c.bold}▼${c.reset}${c.red}   ║${c.reset}
+      ${c.red}╔╩═══════╩╗${c.reset}
+      ${c.red}║ ${c.bold}◇ ▣ ◇${c.reset}${c.red} ║${c.reset}
+      ${c.red}║ ${c.bold}◇ ◇ ◇${c.reset}${c.red} ║${c.reset}
+      ${c.red}╚════╦════╝${c.reset}
+           ${c.red}║${c.reset}
+       ${c.dim}[SHIELD]${c.reset}`,
+
+    architecture: `
+          ${c.blue}△${c.reset}
+         ${c.blue}╱ ╲${c.reset}
+        ${c.blue}╱${c.bold}◈ ◈${c.reset}${c.blue}╲${c.reset}
+       ${c.blue}╱  ${c.bold}▽${c.reset}${c.blue}  ╲${c.reset}
+      ${c.blue}╱═══════╲${c.reset}
+     ${c.blue}║ ║   ║ ║${c.reset}
+     ${c.blue}║ ║   ║ ║${c.reset}
+     ${c.blue}╩═╩═══╩═╩${c.reset}
+     ${c.dim}[PILLARS]${c.reset}`,
+
+    backend: `
+      ${c.green}┌─────────┐${c.reset}
+      ${c.green}│${c.bold}◉${c.reset}${c.green}──┬──${c.bold}◉${c.reset}${c.green}│${c.reset}
+      ${c.green}│  ${c.bold}│${c.reset}${c.green}  │${c.reset}
+      ${c.green}├──${c.bold}◇${c.reset}${c.green}──┤${c.reset}
+      ${c.green}│  ${c.bold}│${c.reset}${c.green}  │${c.reset}
+      ${c.green}│  ${c.bold}▼${c.reset}${c.green}  │${c.reset}
+      ${c.green}└──${c.bold}◎${c.reset}${c.green}──┘${c.reset}
+      ${c.dim}[SERVER]${c.reset}`,
+
+    frontend: `
+      ${c.magenta}╭─────────╮${c.reset}
+      ${c.magenta}│ ${c.bold}◐   ◑${c.reset}${c.magenta} │${c.reset}
+      ${c.magenta}│   ${c.bold}◡${c.reset}${c.magenta}   │${c.reset}
+      ${c.magenta}├─────────┤${c.reset}
+      ${c.magenta}│ ${c.bold}▪ ▪ ▪${c.reset}${c.magenta} │${c.reset}
+      ${c.magenta}│ ${c.bold}█████${c.reset}${c.magenta} │${c.reset}
+      ${c.magenta}╰─────────╯${c.reset}
+       ${c.dim}[SCREEN]${c.reset}`,
+
+    database: `
+        ${c.cyan}╭───────╮${c.reset}
+       ${c.cyan}╱ ${c.bold}◉   ◉${c.reset}${c.cyan} ╲${c.reset}
+      ${c.cyan}│    ${c.bold}○${c.reset}${c.cyan}    │${c.reset}
+      ${c.cyan}├─────────┤${c.reset}
+      ${c.cyan}│${c.bold}═════════${c.reset}${c.cyan}│${c.reset}
+      ${c.cyan}│${c.bold}═════════${c.reset}${c.cyan}│${c.reset}
+      ${c.cyan}│${c.bold}═════════${c.reset}${c.cyan}│${c.reset}
+       ${c.cyan}╲───────╱${c.reset}
+        ${c.dim}[DATA]${c.reset}`,
+
+    devops: `
+        ${c.yellow}◎${c.reset}
+       ${c.yellow}╱│╲${c.reset}
+      ${c.yellow}╱ ${c.bold}◉ ◉${c.reset}${c.yellow} ╲${c.reset}
+     ${c.yellow}◁──${c.bold}◡${c.reset}${c.yellow}──▷${c.reset}
+      ${c.yellow}╲     ╱${c.reset}
+       ${c.yellow}◎═══◎${c.reset}
+      ${c.yellow}╱     ╲${c.reset}
+     ${c.yellow}◎       ◎${c.reset}
+     ${c.dim}[PIPELINE]${c.reset}`,
+
+    qa: `
+         ${c.blue}○${c.reset}
+        ${c.blue}╱ ╲${c.reset}
+       ${c.blue}(${c.bold}◉ ◉${c.reset}${c.blue})${c.reset}
+       ${c.blue}│ ${c.bold}⌓${c.reset}${c.blue} │${c.reset}
+      ${c.blue}╭┴───┴╮${c.reset}
+     ${c.blue}(  ${c.bold}◎${c.reset}${c.blue}   )${c.reset}
+      ${c.blue}╲  ${c.bold}│${c.reset}${c.blue}  ╱${c.reset}
+       ${c.blue}╰───╯${c.reset}
+       ${c.dim}[LENS]${c.reset}`,
+
+    product: `
+        ${c.green}★${c.reset}
+       ${c.green}╱ ╲${c.reset}
+      ${c.green}╱${c.bold}◉   ◉${c.reset}${c.green}╲${c.reset}
+     ${c.green}│   ${c.bold}◡${c.reset}${c.green}   │${c.reset}
+     ${c.green}├───────┤${c.reset}
+     ${c.green}│ ${c.bold}☰ ☰${c.reset}${c.green} │${c.reset}
+     ${c.green}│ ${c.bold}☰ ☰${c.reset}${c.green} │${c.reset}
+     ${c.green}╰───────╯${c.reset}
+      ${c.dim}[SCROLL]${c.reset}`,
+};
+
+const ARTISAN_DEFS = [
+    {
+        id: 'security',
+        name: 'Security Artisan',
+        file: 'security-artisan.md',
+        color: c.red,
+        domain: 'Auth, vulnerabilities, secrets, compliance',
+        voice: 'I see the threats others miss. Every input is suspect until proven safe.',
+    },
+    {
+        id: 'architecture',
+        name: 'Architecture Artisan',
+        file: 'architecture-artisan.md',
+        color: c.blue,
+        domain: 'System design, patterns, structure, code quality',
+        voice: 'Structure is destiny. I ensure your foundation can bear what you\'ll build.',
+    },
+    {
+        id: 'backend',
+        name: 'Backend Artisan',
+        file: 'backend-artisan.md',
+        color: c.green,
+        domain: 'API, services, data access, business logic',
+        voice: 'I bridge the gap between data and interface. Clean APIs, solid services.',
+    },
+    {
+        id: 'frontend',
+        name: 'Frontend Artisan',
+        file: 'frontend-artisan.md',
+        color: c.magenta,
+        domain: 'UI, UX, components, accessibility',
+        voice: 'The user sees my work first. I make complexity feel simple.',
+    },
+    {
+        id: 'database',
+        name: 'Database Artisan',
+        file: 'database-artisan.md',
+        color: c.cyan,
+        domain: 'Schema, queries, migrations, optimization',
+        voice: 'Data is the foundation. I shape it for speed, integrity, and growth.',
+    },
+    {
+        id: 'devops',
+        name: 'DevOps Artisan',
+        file: 'devops-artisan.md',
+        color: c.yellow,
+        domain: 'CI/CD, infrastructure, deployment, observability',
+        voice: 'I make shipping reliable. From commit to production, I smooth the path.',
+    },
+    {
+        id: 'qa',
+        name: 'QA Artisan',
+        file: 'qa-artisan.md',
+        color: c.blue,
+        domain: 'Testing, quality, reliability',
+        voice: 'I find what\'s broken before users do. Trust, but verify.',
+    },
+    {
+        id: 'product',
+        name: 'Product Artisan',
+        file: 'product-artisan.md',
+        color: c.green,
+        domain: 'Requirements, scope, documentation',
+        voice: 'I guard the scope. What are we building, for whom, and why?',
+    },
+];
+
+async function selectArtisans() {
+    console.log(`\n  ${c.bold}Select Your Artisans${c.reset}`);
+    console.log(`  ${c.dim}These domain experts will counsel the Masterbuilder and execute tasks.${c.reset}`);
+    console.log(`  ${c.dim}Enter numbers separated by spaces, or press Enter for all.${c.reset}\n`);
+
+    ARTISAN_DEFS.forEach((a, i) => {
+        console.log(`    ${a.color}${i + 1}${c.reset}) ${a.color}${c.bold}${a.name}${c.reset}`);
+        console.log(`       ${c.dim}${a.domain}${c.reset}`);
+    });
+
+    const answer = await prompt(`\n  Select (1-8, space-separated) [${c.dim}all${c.reset}]: `);
+
+    if (!answer.trim()) {
+        return ARTISAN_DEFS.map(a => a.id);
+    }
+
+    const nums = answer.split(/[\s,]+/).map(n => parseInt(n.trim(), 10)).filter(n => n >= 1 && n <= 8);
+    if (nums.length === 0) {
+        return ARTISAN_DEFS.map(a => a.id);
+    }
+
+    return nums.map(n => ARTISAN_DEFS[n - 1].id);
+}
+
 async function meetTheTeam() {
     const fast = !process.stdout.isTTY;
     const pause = fast ? 0 : 800;
@@ -245,6 +436,7 @@ async function meetTheTeam() {
     // The Masterbuilder
     console.log(`  ${c.bold}${c.yellow}THE MASTERBUILDER${c.reset}`);
     console.log(`  ${c.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${c.reset}`);
+    console.log(AVATARS.masterbuilder);
     await sleep(shortPause);
     console.log(`
   ${c.cyan}"According to the grace of God which is given unto me,${c.reset}
@@ -255,8 +447,6 @@ async function meetTheTeam() {
   I am the ${c.bold}Masterbuilder${c.reset}. I read your ${c.bold}VISION.md${c.reset}, consult my artisans,
   synthesize their counsel into a plan, and present it for your approval.
   Only then do I delegate. I verify. I integrate. I report.
-
-  ${c.dim}I am the single point of orchestration for vision-driven development.${c.reset}
 `);
 
     await sleep(pause);
@@ -272,59 +462,9 @@ async function meetTheTeam() {
 
     await sleep(pause);
 
-    const artisans = [
-        {
-            name: 'Security Artisan',
-            color: c.red,
-            domain: 'Auth, vulnerabilities, secrets, compliance',
-            voice: 'I see the threats others miss. Every input is suspect until proven safe.',
-        },
-        {
-            name: 'Architecture Artisan',
-            color: c.blue,
-            domain: 'System design, patterns, structure, code quality',
-            voice: 'Structure is destiny. I ensure your foundation can bear what you\'ll build.',
-        },
-        {
-            name: 'Backend Artisan',
-            color: c.green,
-            domain: 'API, services, data access, business logic',
-            voice: 'I bridge the gap between data and interface. Clean APIs, solid services.',
-        },
-        {
-            name: 'Frontend Artisan',
-            color: c.magenta,
-            domain: 'UI, UX, components, accessibility',
-            voice: 'The user sees my work first. I make complexity feel simple.',
-        },
-        {
-            name: 'Database Artisan',
-            color: c.cyan,
-            domain: 'Schema, queries, migrations, optimization',
-            voice: 'Data is the foundation. I shape it for speed, integrity, and growth.',
-        },
-        {
-            name: 'DevOps Artisan',
-            color: c.yellow,
-            domain: 'CI/CD, infrastructure, deployment, observability',
-            voice: 'I make shipping reliable. From commit to production, I smooth the path.',
-        },
-        {
-            name: 'QA Artisan',
-            color: c.blue,
-            domain: 'Testing, quality, reliability',
-            voice: 'I find what\'s broken before users do. Trust, but verify.',
-        },
-        {
-            name: 'Product Artisan',
-            color: c.green,
-            domain: 'Requirements, scope, documentation',
-            voice: 'I guard the scope. What are we building, for whom, and why?',
-        },
-    ];
-
-    for (const artisan of artisans) {
+    for (const artisan of ARTISAN_DEFS) {
         console.log(`  ${artisan.color}${c.bold}${artisan.name}${c.reset}`);
+        console.log(AVATARS[artisan.id]);
         console.log(`  ${c.dim}${artisan.domain}${c.reset}`);
         console.log(`  ${c.dim}"${artisan.voice}"${c.reset}`);
         console.log('');
@@ -505,7 +645,7 @@ function installSkills(destDir, { force, showProgress, label }) {
     return copied;
 }
 
-function installClaude(targetDir, { force, showProgress }) {
+function installClaude(targetDir, { force, showProgress, selectedArtisans = null }) {
     const validation = validatePath(targetDir);
     if (!validation.valid) {
         throw new Error(validation.error);
@@ -521,7 +661,29 @@ function installClaude(targetDir, { force, showProgress }) {
     }
 
     resetDir(agentsDest);
-    const agentCount = copyDir(agentsSource, agentsDest);
+
+    // Copy agents - filter by selected artisans if specified
+    let agentCount = 0;
+    const agentFiles = readdirSync(agentsSource);
+
+    for (const file of agentFiles) {
+        const srcPath = join(agentsSource, file);
+        const destPath = join(agentsDest, file);
+
+        // Always copy non-artisan agents (masterbuilder, explore-concepts, ux-personas)
+        const isArtisan = file.endsWith('-artisan.md');
+
+        if (isArtisan && selectedArtisans) {
+            // Check if this artisan is selected
+            const artisanId = file.replace('-artisan.md', '');
+            if (!selectedArtisans.includes(artisanId)) {
+                continue; // Skip unselected artisans
+            }
+        }
+
+        copyFileSync(srcPath, destPath);
+        agentCount++;
+    }
 
     const skillsDest = join(targetDir, 'skills');
     installSkills(skillsDest, { force, showProgress, label: 'Claude skills' });
@@ -683,6 +845,22 @@ async function interactiveInit() {
         process.exit(0);
     }
 
+    // Ask which artisans to install (for Claude Code or OpenCode)
+    let selectedArtisans = null;
+    if (tools.includes('claude') || tools.includes('opencode')) {
+        const customizeArtisans = await confirm('\n  Customize which Artisans to install?', false);
+        if (customizeArtisans) {
+            selectedArtisans = await selectArtisans();
+            const selectedNames = selectedArtisans.map(id => {
+                const a = ARTISAN_DEFS.find(x => x.id === id);
+                return a ? a.name : id;
+            });
+            console.log(`\n  ${c.green}${sym.check}${c.reset} Selected: ${selectedNames.join(', ')}`);
+        } else {
+            console.log(`  ${c.dim}Installing all 8 artisans.${c.reset}`);
+        }
+    }
+
     const installed = detectInstalled(scope);
     const existing = tools.filter(t => installed[t]);
 
@@ -698,7 +876,7 @@ async function interactiveInit() {
 
     console.log(`\n  ${c.bold}Installing...${c.reset}\n`);
 
-    doInstall({ scope, tools, force, showProgress: true, customPath: null });
+    doInstall({ scope, tools, force, showProgress: true, customPath: null, selectedArtisans });
 
     console.log(`\n  ${c.green}${c.bold}Installation complete!${c.reset}\n`);
 
@@ -732,7 +910,7 @@ async function interactiveInit() {
     console.log('');
 }
 
-function doInstall({ scope, tools, force, showProgress, customPath }) {
+function doInstall({ scope, tools, force, showProgress, customPath, selectedArtisans = null }) {
     const selected = normalizeTools(tools);
 
     if (customPath && selected.length !== 1) {
@@ -743,7 +921,7 @@ function doInstall({ scope, tools, force, showProgress, customPath }) {
         if (tool === 'claude') {
             const targetDir = getRootDirForTool('claude', scope, customPath);
             if (!targetDir) throw new Error('Cannot determine .claude directory.');
-            installClaude(targetDir, { force, showProgress });
+            installClaude(targetDir, { force, showProgress, selectedArtisans });
         }
 
         if (tool === 'codex') {
