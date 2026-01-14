@@ -212,7 +212,169 @@ async function confirm(question, defaultYes = true) {
 function printBanner() {
     console.log(`
   ${c.bold}${c.magenta}codehogg${c.reset} ${c.dim}v${getVersion()}${c.reset}
-  ${c.dim}30 agents ${sym.bullet} 45 skills for Claude Code, Codex CLI, and OpenCode${c.reset}
+  ${c.dim}17 agents ${sym.bullet} 45 skills for Claude Code, Codex CLI, and OpenCode${c.reset}
+`);
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function meetTheTeam() {
+    const fast = !process.stdout.isTTY;
+    const pause = fast ? 0 : 800;
+    const shortPause = fast ? 0 : 400;
+
+    console.log(`
+  ${c.bold}${c.magenta}═══════════════════════════════════════════════════════════════${c.reset}
+  ${c.bold}                     MEET YOUR TEAM${c.reset}
+  ${c.magenta}═══════════════════════════════════════════════════════════════${c.reset}
+`);
+
+    await sleep(pause);
+
+    // The Vision
+    console.log(`  ${c.dim}"And the LORD answered me, and said,${c.reset}`);
+    console.log(`  ${c.dim} Write the vision, and make it plain upon tables,${c.reset}`);
+    console.log(`  ${c.dim} that he may run that readeth it."${c.reset}`);
+    console.log(`  ${c.dim}                                    — Habakkuk 2:2${c.reset}`);
+    console.log('');
+
+    await sleep(pause);
+
+    // The Masterbuilder
+    console.log(`  ${c.bold}${c.yellow}THE MASTERBUILDER${c.reset}`);
+    console.log(`  ${c.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${c.reset}`);
+    await sleep(shortPause);
+    console.log(`
+  ${c.cyan}"According to the grace of God which is given unto me,${c.reset}
+  ${c.cyan} as a wise masterbuilder, I have laid the foundation,${c.reset}
+  ${c.cyan} and another buildeth thereon."${c.reset}
+  ${c.dim}                                    — 1 Corinthians 3:10${c.reset}
+
+  I am the ${c.bold}Masterbuilder${c.reset}. I read your ${c.bold}VISION.md${c.reset}, consult my artisans,
+  synthesize their counsel into a plan, and present it for your approval.
+  Only then do I delegate. I verify. I integrate. I report.
+
+  ${c.dim}I am the single point of orchestration for vision-driven development.${c.reset}
+`);
+
+    await sleep(pause);
+
+    // The Artisans intro
+    console.log(`  ${c.bold}${c.green}THE ARTISANS${c.reset}`);
+    console.log(`  ${c.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${c.reset}`);
+    console.log(`
+  ${c.dim}"Where no counsel is, the people fall:${c.reset}
+  ${c.dim} but in the multitude of counsellors there is safety."${c.reset}
+  ${c.dim}                                    — Proverbs 11:14${c.reset}
+`);
+
+    await sleep(pause);
+
+    const artisans = [
+        {
+            name: 'Security Artisan',
+            color: c.red,
+            domain: 'Auth, vulnerabilities, secrets, compliance',
+            voice: 'I see the threats others miss. Every input is suspect until proven safe.',
+        },
+        {
+            name: 'Architecture Artisan',
+            color: c.blue,
+            domain: 'System design, patterns, structure, code quality',
+            voice: 'Structure is destiny. I ensure your foundation can bear what you\'ll build.',
+        },
+        {
+            name: 'Backend Artisan',
+            color: c.green,
+            domain: 'API, services, data access, business logic',
+            voice: 'I bridge the gap between data and interface. Clean APIs, solid services.',
+        },
+        {
+            name: 'Frontend Artisan',
+            color: c.magenta,
+            domain: 'UI, UX, components, accessibility',
+            voice: 'The user sees my work first. I make complexity feel simple.',
+        },
+        {
+            name: 'Database Artisan',
+            color: c.cyan,
+            domain: 'Schema, queries, migrations, optimization',
+            voice: 'Data is the foundation. I shape it for speed, integrity, and growth.',
+        },
+        {
+            name: 'DevOps Artisan',
+            color: c.yellow,
+            domain: 'CI/CD, infrastructure, deployment, observability',
+            voice: 'I make shipping reliable. From commit to production, I smooth the path.',
+        },
+        {
+            name: 'QA Artisan',
+            color: c.blue,
+            domain: 'Testing, quality, reliability',
+            voice: 'I find what\'s broken before users do. Trust, but verify.',
+        },
+        {
+            name: 'Product Artisan',
+            color: c.green,
+            domain: 'Requirements, scope, documentation',
+            voice: 'I guard the scope. What are we building, for whom, and why?',
+        },
+    ];
+
+    for (const artisan of artisans) {
+        console.log(`  ${artisan.color}${c.bold}${artisan.name}${c.reset}`);
+        console.log(`  ${c.dim}${artisan.domain}${c.reset}`);
+        console.log(`  ${c.dim}"${artisan.voice}"${c.reset}`);
+        console.log('');
+        await sleep(shortPause);
+    }
+
+    await sleep(pause);
+
+    // The Workflow
+    console.log(`  ${c.bold}${c.magenta}THE WORKFLOW${c.reset}`);
+    console.log(`  ${c.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${c.reset}`);
+    console.log(`
+                        ┌─────────────┐
+                        │  VISION.md  │
+                        │ ${c.dim}Your intent${c.reset} │
+                        └──────┬──────┘
+                               │
+                        ┌──────▼──────┐
+                        │ MASTERBUILDER│
+                        │ ${c.dim}Orchestrates${c.reset} │
+                        └──────┬──────┘
+                               │
+          ┌────────────────────┼────────────────────┐
+          │                    │                    │
+    ┌─────▼─────┐        ┌─────▼─────┐        ┌─────▼─────┐
+    │  ARTISAN  │        │  ARTISAN  │        │  ARTISAN  │
+    │ ${c.dim}Counsel +${c.reset} │   ...   │ ${c.dim}Counsel +${c.reset} │   ...   │ ${c.dim}Counsel +${c.reset} │
+    │ ${c.dim}Execute${c.reset}   │        │ ${c.dim}Execute${c.reset}   │        │ ${c.dim}Execute${c.reset}   │
+    └───────────┘        └───────────┘        └───────────┘
+`);
+
+    await sleep(pause);
+
+    // Call to action
+    console.log(`  ${c.bold}${c.green}READY TO BUILD${c.reset}`);
+    console.log(`  ${c.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${c.reset}`);
+    console.log(`
+  Your team is installed and ready. Here's how to work with them:
+
+    ${c.cyan}/codehogg${c.reset}                    Strategic review against your VISION.md
+    ${c.cyan}/codehogg "your mission"${c.reset}     Tactical mission with artisan counsel
+
+  First, define your vision:
+
+    ${c.cyan}npx codehogg init${c.reset}            Creates VISION.md in your project
+
+  ${c.dim}"But let every man take heed how he buildeth thereupon."${c.reset}
+  ${c.dim}                                    — 1 Corinthians 3:10${c.reset}
+
+  ${c.bold}${c.magenta}═══════════════════════════════════════════════════════════════${c.reset}
 `);
 }
 
@@ -1107,13 +1269,14 @@ function showHelp() {
     console.log(`
   ${c.bold}codehogg${c.reset} v${getVersion()}
 
-  ${c.dim}30 agents with 45 skills for Claude Code, Codex CLI, and OpenCode.${c.reset}
+  ${c.dim}17 agents with 45 skills for Claude Code, Codex CLI, and OpenCode.${c.reset}
 
   ${c.bold}Usage:${c.reset}
     codehogg [command] [options]
 
   ${c.bold}Commands:${c.reset}
     ${c.cyan}init${c.reset}              Interactive installation wizard + VISION.md setup
+    ${c.cyan}meet${c.reset}              Meet the Masterbuilder and Artisans
     ${c.cyan}update${c.reset}            Update installations (defaults to what's installed)
     ${c.cyan}uninstall${c.reset}         Remove installations (interactive by default)
     ${c.cyan}status${c.reset}            Show installation status
@@ -1281,6 +1444,12 @@ export async function run(args) {
 
         case 'vision': {
             showVisionStatus(scope);
+            break;
+        }
+
+        case 'meet':
+        case 'team': {
+            await meetTheTeam();
             break;
         }
 
