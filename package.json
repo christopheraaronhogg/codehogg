@@ -1,7 +1,7 @@
 {
   "name": "codehogg",
-  "version": "4.0.0",
-  "description": "29 agents with 43 skills for Claude Code, Codex CLI, and OpenCode. Comprehensive codebase audits, feature planning, and implementation guidance.",
+  "version": "5.0.0",
+  "description": "17 agents with 45 skills for Claude Code, Codex CLI, and OpenCode. Vision-driven development with Masterbuilder + Artisans coordination, codebase audits, feature planning, and UX persona testing.",
   "author": "Christopher Hogg",
   "license": "MIT",
   "repository": {
@@ -39,5 +39,8 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "update-notifier": "^7.3.1"
+  }
 }

@@ -1,8 +1,17 @@
 # codehogg
 
-**29 agents + 43 skills for Claude Code, Codex CLI, and OpenCode.**
+**17 agents + 45 skills for Claude Code, Codex CLI, and OpenCode.**
 
-Comprehensive codebase audits, feature planning, UX persona testing, and implementation guidance through a curated set of agents and skills.
+Vision-driven development with Masterbuilder + Artisans coordination, comprehensive codebase audits, feature planning, UX persona testing, and implementation guidance.
+
+> "And the LORD answered me, and said, Write the vision, and make it plain upon tables, that he may run that readeth it."
+> — Habakkuk 2:2 (KJV)
+
+> "According to the grace of God which is given unto me, as a wise masterbuilder, I have laid the foundation, and another buildeth thereon."
+> — 1 Corinthians 3:10 (KJV)
+
+> "Where no counsel is, the people fall: but in the multitude of counsellors there is safety."
+> — Proverbs 11:14 (KJV)
 
 ## Installation
 
@@ -34,6 +43,8 @@ npx codehogg init --opencode --global
 
 ### Keep Up to Date
 
+codehogg automatically checks for updates weekly and notifies you when a new version is available. You can also manually update:
+
 ```bash
 # Update installed tools in this project
 npx codehogg update
@@ -44,6 +55,47 @@ npx codehogg update --global
 # Or target a specific tool
 npx codehogg update --tool codex
 ```
+
+**Disable update checks:** Set `CODEHOGG_NO_UPDATE_CHECK=1` environment variable.
+
+## Vision-Driven Development
+
+The core of codehogg v5.0 is **vision-driven development**. Instead of measuring code against universal standards, codehogg measures against *your declared intent*.
+
+### VISION.md
+
+Create a `VISION.md` in your project root:
+
+```bash
+npx codehogg init
+```
+
+The wizard guides you through defining:
+- **Purpose** — Who is this for and what does it do?
+- **Outcomes** — What does success look like?
+- **Values** — What matters most? What tradeoffs are acceptable?
+- **Constraints** — What's off-limits?
+- **Stage** — Prototype / MVP / Production / Maintenance
+- **Current Focus** — What's the one thing right now?
+
+### The /codehogg Command
+
+```bash
+/codehogg                           # Strategic review: distance-to-vision
+/codehogg "implement OAuth login"   # Tactical mission with counsel
+```
+
+The **Masterbuilder** agent reads your vision, consults domain artisans for counsel, creates a plan with complete task list for your approval, then delegates execution to artisans. Every recommendation traces back to your VISION.md.
+
+### Distance Bands
+
+Progress is measured in honest bands, not false-precision percentages:
+
+| Band | Meaning |
+|------|---------|
+| **Near** | Requirements mostly met; only polish remaining |
+| **Medium** | Core approach exists but gaps block outcomes |
+| **Far** | Missing fundamentals or contradicts vision |
 
 ## Architecture
 
@@ -65,16 +117,16 @@ codehogg ships **agents + skills**, installed into tool-specific folders:
 # (OpenCode skills are loaded from .claude/skills)
 ```
 
-### Agents (29)
+### Agents (17)
 
 Specialized workers that run in their own context window. Each agent:
 - Has a focused persona and expertise
-- Uses a specific model (Opus for deep analysis, Sonnet for implementation)
+- Uses Opus model for deep analysis
 - Has restricted tool access appropriate to their role
 - References skills for domain knowledge
 - Can be proactively triggered by Claude when relevant
 
-### Skills (43)
+### Skills (45)
 
 Domain knowledge that Claude loads automatically when your request matches the skill's description. Skills contain:
 - Evaluation frameworks and methodologies
@@ -92,28 +144,26 @@ Slash commands you invoke explicitly. Commands:
 
 ## The Agents
 
-### Consultant Agents (18)
+### Masterbuilder + Artisans (9)
 
-| Agent | Expertise | Model |
-|-------|-----------|-------|
-| architect-consultant | System design, modularity, patterns | Opus |
-| backend-consultant | API design, services, data access | Opus |
-| code-quality-consultant | Tech debt, maintainability | Opus |
-| compliance-consultant | GDPR, CCPA, privacy | Opus |
-| copy-consultant | Content, voice, AI slop detection | Opus |
-| cost-consultant | Cloud costs, FinOps | Opus |
-| database-consultant | Schema, queries, performance | Opus |
-| devops-consultant | CI/CD, infrastructure | Opus |
-| docs-consultant | Documentation quality | Opus |
-| observability-consultant | Logging, monitoring | Opus |
-| performance-consultant | Bottlenecks, optimization | Opus |
-| product-consultant | Requirements, scope | Opus |
-| qa-consultant | Testing strategy | Opus |
-| security-consultant | OWASP, vulnerabilities | Opus |
-| seo-consultant | Technical SEO | Opus |
-| stack-consultant | Framework best practices | Opus |
-| ui-design-consultant | Visual design, AI slop | Opus |
-| ux-consultant | Usability, accessibility | Opus |
+The core 2-tier architecture for vision-driven development:
+
+| Agent | Role | Model |
+|-------|------|-------|
+| **masterbuilder** | The wise Masterbuilder. Orchestrates all /codehogg operations. | Opus |
+
+**Artisans** — Domain experts that provide counsel AND execute tasks:
+
+| Artisan | Domain |
+|---------|--------|
+| security-artisan | Auth, vulnerabilities, secrets, compliance |
+| architecture-artisan | System design, patterns, structure, code quality |
+| backend-artisan | API, services, data access, business logic |
+| frontend-artisan | UI, UX, components, accessibility |
+| database-artisan | Schema, queries, migrations, optimization |
+| devops-artisan | CI/CD, infrastructure, deployment, observability |
+| qa-artisan | Testing, quality, reliability |
+| product-artisan | Requirements, scope, documentation |
 
 ### UX Persona Agents (7)
 
@@ -127,14 +177,11 @@ Slash commands you invoke explicitly. Commands:
 | ux-persona-david | Accessibility user | Keyboard only, a11y |
 | ux-persona-patricia | Skeptical shopper | Desktop, trust verification |
 
-### Planning & Implementation Agents (4)
+### Creative Agent (1)
 
 | Agent | Purpose | Model |
 |-------|---------|-------|
-| planning-orchestrator | Coordinates full planning workflow with interview, PRD, roundtable | Opus |
-| audit-integrator | Synthesizes 18 audit reports into cross-referenced remediation roadmap | Opus |
-| explore-concepts | Generate 3 distinct design directions | Opus |
-| implementer | Execute implementation from plans | Sonnet |
+| explore-concepts | Generate 3 distinct design directions using physical metaphors | Opus |
 
 ## Commands
 
@@ -144,7 +191,7 @@ Run expert analysis on existing code:
 
 | Command | Description |
 |---------|-------------|
-| `/audit-full` | All 18 consultants + integration phase with remediation roadmap |
+| `/audit-full` | Comprehensive multi-domain audit with remediation roadmap |
 | `/audit-quick` | 7 key agents in 2 waves |
 | `/audit-architecture` | System structure evaluation |
 | `/audit-security` | OWASP vulnerabilities, auth |
@@ -152,7 +199,7 @@ Run expert analysis on existing code:
 | `/audit-database` | Schema, queries, indexes |
 | `/audit-ui` | Visual design, AI slop detection |
 | `/audit-ux` | Usability, accessibility |
-| ... | (18 individual + 4 bundles) |
+| ... | (domain-specific + bundles) |
 
 ### Plan Commands
 
@@ -160,9 +207,9 @@ Plan new features with interview → PRD → roundtable → detailed plans:
 
 | Command | Description |
 |---------|-------------|
-| `/plan-full` | Full 5-phase planning with interview and 9-expert roundtable |
+| `/plan-full` | Full planning workflow with discovery and expert input |
 | `/plan-full "feature"` | Skip interview, proceed with provided details |
-| `/plan-quick` | Streamlined planning with 7 key consultants |
+| `/plan-quick` | Streamlined planning with key domains |
 | `/plan-architecture` | Architecture-focused planning |
 | `/plan-security` | Security-focused planning |
 | ... | (domain-specific planning commands) |
@@ -261,7 +308,7 @@ INTERVIEW → PRD DRAFT → ROUNDTABLE → DETAIL → INTEGRATE
 ```
 
 1. **Interview** — Discover what you want to build (optional if you provide details)
-2. **PRD Draft** — Product consultant creates initial requirements
+2. **PRD Draft** — Product artisan creates initial requirements
 3. **Roundtable** — 9 experts sequentially enrich the PRD
 4. **Detail** — Parallel deep planning for each domain
 5. **Integrate** — Combine into sequenced implementation plan
@@ -306,7 +353,7 @@ All questions are **optional**. Say "skip" or "idk" and the orchestrator:
 With agents defined, Claude can proactively use them:
 
 > **You:** "I just added OAuth login"
-> **Claude:** "I notice you added authentication code. Let me have the security-consultant agent review it in a separate context."
+> **Claude:** "I notice you added authentication code. Let me have the security-artisan review it in a separate context."
 
 ### Wave-Based Execution
 
@@ -321,14 +368,14 @@ Each agent writes their full report to a file and returns only a brief status.
 
 ### Integration Phase
 
-After all 18 consultants complete, the **audit-integrator** agent synthesizes findings:
+After domain audits complete, findings are synthesized:
 
-1. **Cross-references findings** - Issues flagged by 3+ consultants get priority boost
+1. **Cross-references findings** - Issues flagged by multiple domains get priority boost
 2. **Identifies systemic patterns** - "Technical debt concentrated in OrderService"
 3. **Maps dependencies** - "Fix input validation BEFORE addressing SQL injection"
 4. **Creates remediation roadmap** - Phased plan respecting dependencies
 
-This transforms 18 isolated reports into ONE coherent action plan.
+This transforms isolated reports into ONE coherent action plan.
 
 ### Context Isolation
 
@@ -347,9 +394,9 @@ audit-reports/{timestamp}/
 ├── 00-priority-matrix.md        # All findings ranked with corroboration
 ├── 00-remediation-roadmap.md    # Phased action plan with dependencies
 ├── 01-architecture-assessment.md
-├── 02-code-quality-assessment.md
+├── 02-security-assessment.md
 ├── ...
-└── 18-seo-assessment.md
+└── [domain]-assessment.md
 ```
 
 ### Planning Documents
@@ -446,7 +493,7 @@ Get analysis from 7 key agents in about 5 minutes.
 ```
 /audit-security
 ```
-The security-consultant agent runs in isolated context with OWASP methodology.
+The security-artisan runs in isolated context with OWASP methodology.
 
 ### Plan a New Feature
 

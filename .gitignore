@@ -1,1 +1,3 @@
 audit-reports/
+node_modules/
+package-lock.json

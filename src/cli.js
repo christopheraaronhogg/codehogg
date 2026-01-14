@@ -14,6 +14,10 @@ import {
 } from 'fs';
 import { homedir, platform } from 'os';
 import { createInterface } from 'readline';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const updateNotifier = require('update-notifier');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -21,6 +25,8 @@ const PACKAGE_ROOT = resolve(__dirname, '..');
 const TEMPLATES_DIR = join(PACKAGE_ROOT, 'templates');
 
 const TOOL_IDS = ['claude', 'codex', 'opencode'];
+const VISION_TEMPLATE_PATH = join(TEMPLATES_DIR, 'VISION_TEMPLATE.md');
+const CODEHOGG_LOGS_DIR = '.codehogg/logs';
 
 // ANSI colors (works on Windows 10+, macOS, Linux)
 const c = {
@@ -48,6 +54,52 @@ const sym = {
 function getVersion() {
     const pkg = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'));
     return pkg.version;
+}
+
+function checkForUpdates() {
+    const shouldCheck = process.env.CODEHOGG_NO_UPDATE_CHECK !== '1';
+    if (!shouldCheck) return;
+    if (!process.stdout.isTTY) return;
+
+    try {
+        const notifier = updateNotifier({
+            pkg: {
+                name: 'codehogg',
+                version: getVersion(),
+            },
+            updateCheckInterval: 1000 * 60 * 60 * 24 * 7,
+            shouldNotifyInNpmScript: false,
+        });
+
+        const update = notifier.update;
+        if (!update) return;
+
+        notifier.notify({
+            message: `Update available ${c.dim}${update.current}${c.reset} → ${c.green}${update.latest}${c.reset}
+Run ${c.cyan}npx codehogg update${c.reset} to get the latest version`,
+            defer: false,
+            boxenOpts: {
+                padding: 1,
+                margin: 1,
+                align: 'center',
+                borderColor: 'yellow',
+                borderStyle: 'round',
+            },
+        });
+
+        notifier.notify({
+            message: `Update available ${c.dim}${notifier.update.current}${c.reset} → ${c.green}${notifier.update.latest}${c.reset}\nRun ${c.cyan}npx codehogg update${c.reset} to get the latest version`,
+            defer: false,
+            boxenOpts: {
+                padding: 1,
+                margin: 1,
+                align: 'center',
+                borderColor: 'yellow',
+                borderStyle: 'round',
+            },
+        });
+    } catch (err) {
+    }
 }
 
 function getHomedir() {
@@ -160,7 +212,7 @@ async function confirm(question, defaultYes = true) {
 function printBanner() {
     console.log(`
   ${c.bold}${c.magenta}codehogg${c.reset} ${c.dim}v${getVersion()}${c.reset}
-  ${c.dim}29 agents ${sym.bullet} 43 skills for Claude Code, Codex CLI, and OpenCode${c.reset}
+  ${c.dim}30 agents ${sym.bullet} 45 skills for Claude Code, Codex CLI, and OpenCode${c.reset}
 `);
 }
 
@@ -488,15 +540,31 @@ async function interactiveInit() {
 
     console.log(`\n  ${c.green}${c.bold}Installation complete!${c.reset}\n`);
 
+    // Offer to create VISION.md for project-scope installs
+    if (scope === 'project') {
+        const visionPath = getVisionPath(scope);
+        if (!existsSync(visionPath)) {
+            console.log(`  ${c.bold}Vision-Driven Development${c.reset}`);
+            console.log(`  ${c.dim}VISION.md lets /codehogg align recommendations with your project goals.${c.reset}\n`);
+
+            const createVision = await confirm('Create VISION.md now?', true);
+            if (createVision) {
+                await initVision(scope);
+            } else {
+                console.log(`\n  ${c.dim}You can create it later with 'codehogg init' or by creating VISION.md manually.${c.reset}\n`);
+            }
+        }
+    }
+
     console.log(`  ${c.bold}Quick start:${c.reset}`);
     if (tools.includes('claude')) {
-        console.log(`    ${c.cyan}Claude Code:${c.reset} /audit-quick, /audit-full, /plan-full`);
+        console.log(`    ${c.cyan}Claude Code:${c.reset} /codehogg (vision-aligned) or /audit-quick, /plan-full`);
     }
     if (tools.includes('codex')) {
-        console.log(`    ${c.cyan}Codex CLI:${c.reset} use $audit-quick (or /skills to browse)`);
+        console.log(`    ${c.cyan}Codex CLI:${c.reset} use $codehogg or $audit-quick`);
     }
     if (tools.includes('opencode')) {
-        console.log(`    ${c.cyan}OpenCode:${c.reset} use skills (audit-quick) or @architect-consultant`);
+        console.log(`    ${c.cyan}OpenCode:${c.reset} use /codehogg or @team-lead`);
     }
 
     console.log('');
@@ -773,20 +841,284 @@ function status(customPath = null) {
     console.log('');
 }
 
+// ============================================================================
+// VISION.md Management
+// ============================================================================
+
+function getVisionPath(scope) {
+    if (scope === 'global') {
+        const home = getHomedir();
+        return home ? join(home, 'VISION.md') : null;
+    }
+    return join(process.cwd(), 'VISION.md');
+}
+
+function parseVisionSections(content) {
+    const sections = {
+        purpose: null,
+        outcomes: null,
+        values: null,
+        constraints: null,
+        stage: null,
+        focus: null,
+    };
+
+    const sectionPatterns = [
+        { key: 'purpose', pattern: /## Purpose\s*\n([\s\S]*?)(?=\n## |$)/ },
+        { key: 'outcomes', pattern: /## Outcomes\s*\n([\s\S]*?)(?=\n## |$)/ },
+        { key: 'values', pattern: /## Values\s*\n([\s\S]*?)(?=\n## |$)/ },
+        { key: 'constraints', pattern: /## Constraints\s*\n([\s\S]*?)(?=\n## |$)/ },
+        { key: 'stage', pattern: /## Stage\s*\n([\s\S]*?)(?=\n## |$)/ },
+        { key: 'focus', pattern: /## Current Focus\s*\n([\s\S]*?)(?=\n## |$)/ },
+    ];
+
+    for (const { key, pattern } of sectionPatterns) {
+        const match = content.match(pattern);
+        if (match) {
+            // Remove HTML comments and trim
+            let text = match[1]
+                .replace(/<!--[\s\S]*?-->/g, '')
+                .trim();
+            // Only mark as filled if there's actual content
+            sections[key] = text.length > 0 ? text : null;
+        }
+    }
+
+    return sections;
+}
+
+async function initVision(scope) {
+    const visionPath = getVisionPath(scope);
+    if (!visionPath) {
+        console.log(`\n  ${c.red}Error:${c.reset} Cannot determine vision path.\n`);
+        return false;
+    }
+
+    if (existsSync(visionPath)) {
+        console.log(`\n  ${c.yellow}${sym.warn}${c.reset} VISION.md already exists at: ${visionPath}`);
+        const overwrite = await confirm('Overwrite existing VISION.md?', false);
+        if (!overwrite) {
+            console.log(`\n  ${c.dim}Keeping existing VISION.md.${c.reset}\n`);
+            return false;
+        }
+    }
+
+    console.log(`\n  ${c.bold}Create VISION.md${c.reset}`);
+    console.log(`  ${c.dim}All questions are optional. Press Enter to skip.${c.reset}\n`);
+
+    const purpose = await prompt(`  ${c.cyan}Purpose${c.reset} (Who is this for and what does it do?):\n  > `);
+    const outcomes = await prompt(`  ${c.cyan}Outcomes${c.reset} (What does success look like?):\n  > `);
+    const values = await prompt(`  ${c.cyan}Values${c.reset} (What matters most? Tradeoffs?):\n  > `);
+    const constraints = await prompt(`  ${c.cyan}Constraints${c.reset} (Off-limits? Time, budget, compliance?):\n  > `);
+
+    const stageChoice = await select('Current stage?', [
+        { value: 'Prototype', label: 'Prototype', desc: 'Exploring ideas, nothing production-ready' },
+        { value: 'MVP', label: 'MVP', desc: 'Core functionality, shipping to early users' },
+        { value: 'Production', label: 'Production', desc: 'Live product, real users, stability matters' },
+        { value: 'Maintenance', label: 'Maintenance', desc: 'Stable product, bug fixes and minor features' },
+        { value: '', label: 'Skip', desc: 'Leave unspecified' },
+    ]);
+
+    const focus = await prompt(`  ${c.cyan}Current Focus${c.reset} (What's the one thing right now?):\n  > `);
+
+    // Build VISION.md content
+    let content = `# Vision
+
+> "And the LORD answered me, and said, Write the vision, and make it plain upon tables, that he may run that readeth it."
+> — Habakkuk 2:2 (KJV)
+
+## Purpose
+${purpose || '<!-- Who is this for and what does it do? -->'}
+
+## Outcomes
+${outcomes || '<!-- What does success look like? Be concrete. -->'}
+
+## Values
+${values || '<!-- What matters most? What tradeoffs are acceptable? -->'}
+
+## Constraints
+${constraints || '<!-- What\'s off-limits? Time, budget, compliance, dependencies? -->'}
+
+## Stage
+${stageChoice || '<!-- Where are we? Prototype / MVP / Production / Maintenance -->'}
+
+## Current Focus
+${focus || '<!-- What\'s the one thing right now? -->'}
+`;
+
+    writeFileSync(visionPath, content);
+    console.log(`\n  ${c.green}${sym.check}${c.reset} Created VISION.md at: ${visionPath}\n`);
+
+    return true;
+}
+
+function showVisionStatus(scope) {
+    const visionPath = getVisionPath(scope);
+
+    console.log(`\n  ${c.bold}codehogg${c.reset} v${getVersion()}`);
+    console.log(`  ${c.bold}Vision Status${c.reset}\n`);
+
+    if (!visionPath || !existsSync(visionPath)) {
+        console.log(`  ${c.yellow}${sym.warn}${c.reset} No VISION.md found.`);
+        console.log(`  ${c.dim}Run 'codehogg init' to create one.${c.reset}\n`);
+        return;
+    }
+
+    const content = readFileSync(visionPath, 'utf8');
+    const sections = parseVisionSections(content);
+
+    console.log(`  ${c.dim}Path:${c.reset} ${visionPath}\n`);
+
+    const sectionNames = {
+        purpose: 'Purpose',
+        outcomes: 'Outcomes',
+        values: 'Values',
+        constraints: 'Constraints',
+        stage: 'Stage',
+        focus: 'Current Focus',
+    };
+
+    let filledCount = 0;
+    const totalCount = Object.keys(sections).length;
+
+    for (const [key, value] of Object.entries(sections)) {
+        const name = sectionNames[key];
+        if (value) {
+            filledCount++;
+            const preview = value.length > 60 ? value.substring(0, 60) + '...' : value;
+            console.log(`  ${c.green}${sym.check}${c.reset} ${name}: ${c.dim}${preview}${c.reset}`);
+        } else {
+            console.log(`  ${c.dim}${sym.bullet} ${name}: (blank)${c.reset}`);
+        }
+    }
+
+    console.log(`\n  ${c.bold}Summary:${c.reset} ${filledCount}/${totalCount} sections populated`);
+
+    if (filledCount < totalCount) {
+        console.log(`  ${c.dim}Edit VISION.md directly to add more detail.${c.reset}`);
+    }
+
+    console.log('');
+}
+
+// ============================================================================
+// Task Logging
+// ============================================================================
+
+function getLogsDir(scope) {
+    if (scope === 'global') {
+        const home = getHomedir();
+        return home ? join(home, CODEHOGG_LOGS_DIR) : null;
+    }
+    return join(process.cwd(), CODEHOGG_LOGS_DIR);
+}
+
+function showLogs(scope, opts = {}) {
+    const logsDir = getLogsDir(scope);
+
+    console.log(`\n  ${c.bold}codehogg${c.reset} v${getVersion()}`);
+    console.log(`  ${c.bold}Task Logs${c.reset}\n`);
+
+    if (!logsDir || !existsSync(logsDir)) {
+        console.log(`  ${c.dim}No logs found.${c.reset}`);
+        console.log(`  ${c.dim}Logs are created when you run /codehogg commands.${c.reset}\n`);
+        return;
+    }
+
+    // Get date directories
+    const dateDirs = readdirSync(logsDir)
+        .filter(d => {
+            const p = join(logsDir, d);
+            return statSync(p).isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(d);
+        })
+        .sort()
+        .reverse();
+
+    if (dateDirs.length === 0) {
+        console.log(`  ${c.dim}No logs found.${c.reset}\n`);
+        return;
+    }
+
+    // Filter by date if specified
+    const targetDate = opts.date;
+    const taskId = opts.task;
+
+    // If task ID specified, find and show that task
+    if (taskId) {
+        for (const dateDir of dateDirs) {
+            const taskPath = join(logsDir, dateDir, `${taskId}.md`);
+            if (existsSync(taskPath)) {
+                console.log(`  ${c.dim}Date:${c.reset} ${dateDir}`);
+                console.log(`  ${c.dim}Task:${c.reset} ${taskId}\n`);
+                const content = readFileSync(taskPath, 'utf8');
+                console.log(content);
+                return;
+            }
+        }
+        console.log(`  ${c.yellow}${sym.warn}${c.reset} Task not found: ${taskId}\n`);
+        return;
+    }
+
+    // Show logs by date
+    const filteredDates = targetDate
+        ? dateDirs.filter(d => d === targetDate)
+        : dateDirs.slice(0, 5); // Show last 5 days by default
+
+    if (filteredDates.length === 0) {
+        console.log(`  ${c.dim}No logs found for date: ${targetDate}${c.reset}\n`);
+        return;
+    }
+
+    for (const dateDir of filteredDates) {
+        const datePath = join(logsDir, dateDir);
+        const tasks = readdirSync(datePath)
+            .filter(f => f.endsWith('.md'))
+            .sort();
+
+        if (tasks.length === 0) continue;
+
+        console.log(`  ${c.bold}${dateDir}${c.reset}`);
+
+        for (const task of tasks) {
+            const taskId = task.replace('.md', '');
+            const taskPath = join(datePath, task);
+            const content = readFileSync(taskPath, 'utf8');
+
+            // Extract status from log
+            const statusMatch = content.match(/\*\*Status:\*\*\s*(\w+)/);
+            const status = statusMatch ? statusMatch[1] : 'Unknown';
+
+            // Extract mode from log
+            const modeMatch = content.match(/\*\*Mode:\*\*\s*(\w+)/);
+            const mode = modeMatch ? modeMatch[1] : '';
+
+            const statusIcon = status === 'Completed' ? c.green + sym.check : c.yellow + sym.bullet;
+
+            console.log(`    ${statusIcon}${c.reset} ${taskId} ${c.dim}(${mode})${c.reset}`);
+        }
+
+        console.log('');
+    }
+
+    console.log(`  ${c.dim}Use 'codehogg log --task <id>' to view a specific task.${c.reset}\n`);
+}
+
 function showHelp() {
     console.log(`
   ${c.bold}codehogg${c.reset} v${getVersion()}
 
-  ${c.dim}29 agents with 43 skills for Claude Code, Codex CLI, and OpenCode.${c.reset}
+  ${c.dim}30 agents with 45 skills for Claude Code, Codex CLI, and OpenCode.${c.reset}
 
   ${c.bold}Usage:${c.reset}
     codehogg [command] [options]
 
   ${c.bold}Commands:${c.reset}
-    ${c.cyan}init${c.reset}              Interactive installation wizard
+    ${c.cyan}init${c.reset}              Interactive installation wizard + VISION.md setup
     ${c.cyan}update${c.reset}            Update installations (defaults to what's installed)
     ${c.cyan}uninstall${c.reset}         Remove installations (interactive by default)
     ${c.cyan}status${c.reset}            Show installation status
+    ${c.cyan}vision${c.reset}            Show VISION.md status (populated vs blank sections)
+    ${c.cyan}log${c.reset}               Show task logs from /codehogg commands
     ${c.cyan}help${c.reset}              Show this help
 
   ${c.bold}Options:${c.reset}
@@ -798,15 +1130,19 @@ function showHelp() {
     --codex           Alias for --tool codex
     --opencode        Alias for --tool opencode
     --path <dir>      Custom directory (single-tool installs only)
+    --task <id>       (log) View a specific task log by ID
+    --date <YYYY-MM-DD> (log) Filter logs by date
     --version, -v     Show version
     --help, -h        Show this help
 
   ${c.bold}Examples:${c.reset}
-    npx codehogg init
-    npx codehogg init --tool codex
-    npx codehogg init --claude --codex
-    npx codehogg update --global
-    npx codehogg uninstall --tool opencode
+    npx codehogg init                    # Interactive install + VISION.md setup
+    npx codehogg init --claude --codex   # Non-interactive install
+    npx codehogg update --global         # Update global installations
+    npx codehogg vision                  # Show VISION.md status
+    npx codehogg log                     # Show recent task logs
+    npx codehogg log --date 2026-01-15   # Show logs from specific date
+    npx codehogg log --task implement-oauth # View specific task log
 `);
 }
 
@@ -818,6 +1154,8 @@ function parseArgs(args) {
         force: false,
         path: null,
         tools: [],
+        task: null,
+        date: null,
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -875,6 +1213,18 @@ function parseArgs(args) {
             continue;
         }
 
+        if (a === '--task') {
+            opts.task = args[i + 1] ?? null;
+            i++;
+            continue;
+        }
+
+        if (a === '--date') {
+            opts.date = args[i + 1] ?? null;
+            i++;
+            continue;
+        }
+
         if (a.startsWith('-')) {
             continue;
         }
@@ -890,6 +1240,10 @@ function parseArgs(args) {
 export async function run(args) {
     const opts = parseArgs(args);
     const scope = opts.global ? 'global' : 'project';
+
+    if (opts.command !== 'version') {
+        checkForUpdates();
+    }
 
     switch (opts.command) {
         case 'init': {
@@ -922,6 +1276,17 @@ export async function run(args) {
 
         case 'status': {
             status(opts.path);
+            break;
+        }
+
+        case 'vision': {
+            showVisionStatus(scope);
+            break;
+        }
+
+        case 'log':
+        case 'logs': {
+            showLogs(scope, { task: opts.task, date: opts.date });
             break;
         }
 

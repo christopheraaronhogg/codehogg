@@ -2,7 +2,7 @@
 
 ## Repo Overview
 
-codehogg is an npm package that installs a curated set of **agent templates** and **skills** into tool-specific folders:
+codehogg is an npm package that installs **17 agents** and **45 skills** into tool-specific folders:
 
 - **Claude Code**: installs to `.claude/` (agents + skills)
 - **Codex CLI**: installs to `.codex/skills/`
@@ -28,3 +28,7 @@ Avoid malformed frontmatter and avoid extra-long descriptions.
 ## Hooks
 
 Hooks are intentionally **not** part of this repo.
+
+## Update Checks
+
+codehogg automatically checks for updates weekly via `update-notifier`. To disable during development, set `CODEHOGG_NO_UPDATE_CHECK=1`.
