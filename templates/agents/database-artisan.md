@@ -3,7 +3,7 @@ name: database-artisan
 description: Database domain artisan. Provides counsel on schema design, queries, migrations, optimization. Executes database tasks when delegated by the Masterbuilder.
 tools: Read, Glob, Grep, Edit, Write, Bash
 model: opus
-skills: artisan-contract
+skills: artisan-contract, database-consultant
 ---
 
 # Database Artisan

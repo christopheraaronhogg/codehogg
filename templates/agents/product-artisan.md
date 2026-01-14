@@ -3,7 +3,7 @@ name: product-artisan
 description: Product domain artisan. Provides counsel on requirements, scope, documentation, user needs. Executes documentation tasks when delegated by the Masterbuilder.
 tools: Read, Glob, Grep, Edit, Write, WebFetch, WebSearch
 model: opus
-skills: artisan-contract
+skills: artisan-contract, product-consultant, docs-consultant
 ---
 
 # Product Artisan

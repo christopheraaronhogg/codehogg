@@ -1,3 +1,8 @@
 audit-reports/
 node_modules/
 package-lock.json
+
+# Local codehogg installations (generated, not source)
+.claude/
+.codex/
+.opencode/

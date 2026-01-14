@@ -1,6 +1,6 @@
 # codehogg
 
-**9 agents + 46 skills for Claude Code, Codex CLI, and OpenCode.**
+**9 agents + 21 skills for Claude Code, Codex CLI, and OpenCode.**
 
 Vision-driven development with Masterbuilder + Artisans coordination. The Masterbuilder reads your VISION.md, consults domain artisans for counsel, creates plans for your approval, delegates execution, and verifies results.
 
@@ -125,7 +125,7 @@ The Masterbuilder + 8 domain Artisans. Each agent:
 - Has restricted tool access appropriate to their role
 - References skills for domain knowledge
 
-### Skills (46)
+### Skills (21)
 
 Domain knowledge that Claude loads automatically when your request matches the skill's description. Skills contain:
 - Evaluation frameworks and methodologies

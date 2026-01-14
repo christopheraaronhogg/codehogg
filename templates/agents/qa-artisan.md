@@ -3,7 +3,7 @@ name: qa-artisan
 description: QA domain artisan. Provides counsel on testing strategy, coverage, reliability. Executes testing tasks when delegated by the Masterbuilder.
 tools: Read, Glob, Grep, Edit, Write, Bash
 model: opus
-skills: artisan-contract
+skills: artisan-contract, qa-consultant
 ---
 
 # QA Artisan

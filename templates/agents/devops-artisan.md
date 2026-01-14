@@ -3,7 +3,7 @@ name: devops-artisan
 description: DevOps domain artisan. Provides counsel on CI/CD, infrastructure, deployment, observability. Executes devops tasks when delegated by the Masterbuilder.
 tools: Read, Glob, Grep, Edit, Write, Bash, WebFetch, WebSearch
 model: opus
-skills: artisan-contract
+skills: artisan-contract, devops-consultant, cost-consultant, observability-consultant
 ---
 
 # DevOps Artisan

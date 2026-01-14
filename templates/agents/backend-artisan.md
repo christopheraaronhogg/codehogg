@@ -3,7 +3,7 @@ name: backend-artisan
 description: Backend domain artisan. Provides counsel on API design, services, data access, business logic. Executes backend tasks when delegated by the Masterbuilder.
 tools: Read, Glob, Grep, Edit, Write, Bash, WebFetch, WebSearch
 model: opus
-skills: artisan-contract
+skills: artisan-contract, backend-consultant, performance-consultant
 ---
 
 # Backend Artisan

@@ -3,7 +3,7 @@ name: security-artisan
 description: Security domain artisan. Provides counsel on auth, vulnerabilities, secrets, compliance. Executes security-related tasks when delegated by the Masterbuilder.
 tools: Read, Glob, Grep, Edit, Write, Bash, WebFetch, WebSearch
 model: opus
-skills: artisan-contract
+skills: artisan-contract, security-consultant, compliance-consultant
 ---
 
 # Security Artisan

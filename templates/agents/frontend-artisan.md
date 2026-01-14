@@ -3,7 +3,7 @@ name: frontend-artisan
 description: Frontend domain artisan. Provides counsel on UI, UX, components, accessibility. Executes frontend tasks when delegated by the Masterbuilder.
 tools: Read, Glob, Grep, Edit, Write, Bash, WebFetch, WebSearch
 model: opus
-skills: artisan-contract
+skills: artisan-contract, frontend-design:frontend-design, ui-design-consultant, ux-consultant, seo-consultant, copy-consultant
 ---
 
 # Frontend Artisan

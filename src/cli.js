@@ -212,7 +212,7 @@ async function confirm(question, defaultYes = true) {
 function printBanner() {
     console.log(`
   ${c.bold}${c.magenta}codehogg${c.reset} ${c.dim}v${getVersion()}${c.reset}
-  ${c.dim}9 agents ${sym.bullet} 46 skills for Claude Code, Codex CLI, and OpenCode${c.reset}
+  ${c.dim}9 agents ${sym.bullet} 21 skills for Claude Code, Codex CLI, and OpenCode${c.reset}
 `);
 }
 
@@ -1447,7 +1447,7 @@ function showHelp() {
     console.log(`
   ${c.bold}codehogg${c.reset} v${getVersion()}
 
-  ${c.dim}9 agents + 46 skills for Claude Code, Codex CLI, and OpenCode.${c.reset}
+  ${c.dim}9 agents + 21 skills for Claude Code, Codex CLI, and OpenCode.${c.reset}
 
   ${c.bold}Usage:${c.reset}
     codehogg [command] [options]

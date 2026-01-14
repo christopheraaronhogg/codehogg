@@ -368,15 +368,6 @@ Deliver UI design document with:
 
 **Be specific about visual design. Reference exact design tokens and component patterns.**
 
-## ADN-Specific Guidelines
-
-Reference DESIGN_SYSTEM.md:
-- Gold accent #ffcd00
-- rounded-2xl for cards
-- Dark mode with useAppearance()
-- Fraunces display font
-- Instrument Sans body font
-
 ## Minimal Return Pattern
 
 Write full design to file, return only:

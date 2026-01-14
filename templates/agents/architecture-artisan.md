@@ -3,7 +3,7 @@ name: architecture-artisan
 description: Architecture domain artisan. Provides counsel on system design, patterns, structure, code quality. Executes architecture-related tasks when delegated by the Masterbuilder.
 tools: Read, Glob, Grep, Edit, Write, Bash
 model: opus
-skills: artisan-contract
+skills: artisan-contract, architect-consultant, code-quality-consultant, stack-consultant
 ---
 
 # Architecture Artisan
