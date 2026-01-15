@@ -82,16 +82,16 @@ async function generateStructuralASCII(agentName, imageFile) {
                 //      [  0  0  0 ]
                 //      [ +1 +2 +1 ]
 
-                const p00 = Jimp.intToRGBA(image.getPixelColor(x, y)).r;
-                const p10 = Jimp.intToRGBA(image.getPixelColor(x + 1, y)).r;
-                const p20 = Jimp.intToRGBA(image.getPixelColor(x + 2, y)).r || p10;
+                const p00 = intToRGBA(image.getPixelColor(x, y)).r;
+                const p10 = intToRGBA(image.getPixelColor(x + 1, y)).r;
+                const p20 = intToRGBA(image.getPixelColor(x + 2, y)).r || p10;
 
-                const p01 = Jimp.intToRGBA(image.getPixelColor(x, y + 1)).r;
-                const p21 = Jimp.intToRGBA(image.getPixelColor(x + 2, y + 1)).r || p10;
+                const p01 = intToRGBA(image.getPixelColor(x, y + 1)).r;
+                const p21 = intToRGBA(image.getPixelColor(x + 2, y + 1)).r || p10;
 
-                const p02 = Jimp.intToRGBA(image.getPixelColor(x, y + 2)).r || p01;
-                const p12 = Jimp.intToRGBA(image.getPixelColor(x + 1, y + 2)).r || p01;
-                const p22 = Jimp.intToRGBA(image.getPixelColor(x + 2, y + 2)).r || p01;
+                const p02 = intToRGBA(image.getPixelColor(x, y + 2)).r || p01;
+                const p12 = intToRGBA(image.getPixelColor(x + 1, y + 2)).r || p01;
+                const p22 = intToRGBA(image.getPixelColor(x + 2, y + 2)).r || p01;
 
                 // Simple gradient approximation
                 // Gx ≈ (p00 + 2*p01 + p02) - (p20 + 2*p21 + p22) ? No, that's left minus right
