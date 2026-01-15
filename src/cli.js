@@ -13,7 +13,7 @@ import {
     writeFileSync,
 } from 'fs';
 import { homedir, platform } from 'os';
-import { createInterface } from 'readline';
+import readline, { createInterface, emitKeypressEvents } from 'readline';
 import updateNotifier from 'update-notifier';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -135,7 +135,7 @@ function drawBox(lines, opts = {}) {
 function createSpinner(text) {
     if (!process.stdout.isTTY) {
         console.log(`  ${sym.bullet} ${text}`);
-        return { stop: () => {}, succeed: () => {}, fail: () => {} };
+        return { stop: () => { }, succeed: () => { }, fail: () => { } };
     }
 
     let i = 0;
@@ -331,6 +331,14 @@ function getAgentLocations() {
         });
     }
 
+    // Templates (Available to be installed)
+    locations.push({
+        label: 'Available',
+        path: TEMPLATES_DIR,
+        tool: 'all',
+        scope: 'available',
+    });
+
     return locations;
 }
 
@@ -372,6 +380,13 @@ function parseAgentFile(filePath) {
             }
         }
 
+        // Extract ASCII Art (looking for text blocks)
+        let asciiArt = '';
+        const asciiMatch = content.match(/```text\n([\s\S]+?)\n```/);
+        if (asciiMatch) {
+            asciiArt = asciiMatch[1];
+        }
+
         return {
             name,
             description: description || 'No description',
@@ -380,6 +395,7 @@ function parseAgentFile(filePath) {
             skills,
             path: filePath,
             favorite: isFavorite(name),
+            asciiArt,
         };
     } catch {
         return null;
@@ -1544,7 +1560,12 @@ async function meetTheTeam() {
     // The Masterbuilder
     console.log(`  ${c.bold}${c.yellow}PAUL — THE MASTERBUILDER${c.reset}`);
     console.log(`  ${c.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${c.reset}`);
-    console.log(AVATARS.paul);
+    const paulAgent = parseAgentFile(join(TEMPLATES_DIR, 'paul.md'));
+    if (paulAgent && paulAgent.asciiArt) {
+        console.log(paulAgent.asciiArt);
+    } else {
+        console.log(AVATARS.paul);
+    }
     await sleep(shortPause);
     console.log(`
   ${c.cyan}"According to the grace of God which is given unto me,${c.reset}
@@ -1572,7 +1593,13 @@ async function meetTheTeam() {
 
     for (const artisan of ARTISAN_DEFS) {
         console.log(`  ${artisan.color}${c.bold}${artisan.name}${c.reset}`);
-        console.log(AVATARS[artisan.id]);
+        const templatePath = join(TEMPLATES_DIR, artisan.file);
+        const agent = parseAgentFile(templatePath);
+        if (agent && agent.asciiArt) {
+            console.log(agent.asciiArt);
+        } else {
+            console.log(AVATARS[artisan.id]);
+        }
         console.log(`  ${c.dim}${artisan.domain}${c.reset}`);
         if (artisan.verse) {
             console.log(`  ${c.dim}${artisan.verse.ref}${c.reset} ${c.dim}"${artisan.verse.text}"${c.reset}`);
@@ -2800,7 +2827,9 @@ function dashboard() {
     console.log('');
     console.log(drawBox([
         `  ${c.bold}${c.magenta}wtv${c.reset} ${c.dim}v${getVersion()}${c.reset}`,
-        `  ${c.dim}Agent Command Center${c.reset}`,
+        `  ${c.dim}By the power of Biblical Artisans${c.reset}`,
+        ``,
+        `  ${c.green}Run 'wtv meet' to be introduced to the team.${c.reset}`,
     ], { style: 'round', color: c.magenta, padding: 0 }));
     console.log('');
 
@@ -2911,7 +2940,140 @@ function dashboard() {
 // AGENT COMMANDS
 // ============================================================================
 
-function agentsList() {
+async function agentsInteractive() {
+    const agents = discoverAgents();
+    if (agents.length === 0) {
+        console.log(`\n  ${c.yellow}${sym.warn}${c.reset} No agents discovered.`);
+        return;
+    }
+
+    let selectedIndex = 0;
+    let favoritesSnapshot = agents.map(a => a.favorite);
+    let changed = false;
+
+    const rl = createInterface({
+        input: process.stdin,
+        output: process.stdout,
+    });
+
+    emitKeypressEvents(process.stdin);
+    if (process.stdin.isTTY) {
+        process.stdin.setRawMode(true);
+    }
+
+    const render = () => {
+        const width = getWidth();
+        const sidebarWidth = 25;
+        const mainWidth = width - sidebarWidth - 5;
+
+        // Clear screen and reset cursor
+        process.stdout.write('\x1b[2J\x1b[H');
+
+        console.log(`  ${c.bold}${c.magenta}wtv${c.reset} ${c.dim}Agent Manager${c.reset}\n`);
+
+        const star = isWindows ? '*' : '★';
+        const empty = isWindows ? '[ ]' : '◌';
+        const checked = isWindows ? '[x]' : '●';
+
+        let lastScope = null;
+        for (let i = 0; i < agents.length; i++) {
+            const agent = agents[i];
+            const isSelected = i === selectedIndex;
+            const isFav = favoritesSnapshot[i];
+
+            // Scope header
+            if (agent.location.label !== lastScope) {
+                console.log(`  ${c.bold}${c.underlined}${agent.location.label.toUpperCase()}${c.reset}`);
+                lastScope = agent.location.label;
+            }
+
+            const cursor = isSelected ? c.magenta + sym.arrow + c.reset : ' ';
+            const favIcon = isFav ? c.yellow + star + c.reset : c.dim + ' ' + c.reset;
+            const nameColor = isSelected ? c.magenta + c.bold : (isFav ? c.reset : c.dim);
+
+            let line = `  ${cursor} ${favIcon} ${nameColor}${agent.name.padEnd(sidebarWidth - 5)}${c.reset}`;
+
+            // Add sidebar separator
+            line += c.dim + ' │ ' + c.reset;
+
+            if (i < 20) { // Limit list height
+                process.stdout.write(line + '\n');
+            }
+        }
+
+        // Now print the detail pane specifically for the selected agent
+        // We'll use ANSI escape codes to jump back up and print on the right side
+        const detailStartY = 4;
+        const detailStartX = sidebarWidth + 5;
+        const agent = agents[selectedIndex];
+
+        const details = [
+            `${c.magenta}${c.bold}${agent.name.toUpperCase()}${c.reset}`,
+            `${c.dim}${agent.description}${c.reset}`,
+            '',
+            agent.asciiArt ? agent.asciiArt : `${c.dim}[ No Portrait ]${c.reset}`
+        ];
+
+        const allDetailLines = details.flatMap(d => d.split('\n'));
+        for (let i = 0; i < allDetailLines.length; i++) {
+            process.stdout.write(`\x1b[${detailStartY + i};${detailStartX}H${allDetailLines[i]}`);
+        }
+
+        // Footer
+        process.stdout.write(`\x1b[${Math.max(agents.length + 6, 25)};1H`);
+        console.log(`\n  ${c.dim}↑/↓: Navigate • Space: Toggle • Enter: Save • Esc/q: Quit${c.reset}`);
+    };
+
+    render();
+
+    return new Promise((resolve) => {
+        const onKey = async (str, key) => {
+            if (key.name === 'up') {
+                selectedIndex = (selectedIndex - 1 + agents.length) % agents.length;
+                render();
+            } else if (key.name === 'down') {
+                selectedIndex = (selectedIndex + 1) % agents.length;
+                render();
+            } else if (key.name === 'space') {
+                favoritesSnapshot[selectedIndex] = !favoritesSnapshot[selectedIndex];
+                changed = true;
+                render();
+            } else if (key.name === 'return') {
+                // Save changes
+                if (changed) {
+                    const config = loadConfig();
+                    const newFavs = agents.filter((a, i) => favoritesSnapshot[i]).map(a => a.name);
+                    config.favorites = newFavs;
+                    saveConfig(config);
+                    console.log(`\n  ${c.green}${sym.check}${c.reset} Configuration saved.`);
+                }
+                cleanup();
+                resolve();
+            } else if (key.name === 'q' || key.name === 'escape' || (key.ctrl && key.name === 'c')) {
+                cleanup();
+                resolve();
+            }
+        };
+
+        const cleanup = () => {
+            process.stdin.removeListener('keypress', onKey);
+            if (process.stdin.isTTY) {
+                process.stdin.setRawMode(false);
+            }
+            rl.close();
+            console.log('\x1b[2J\x1b[H'); // Clear final screen
+        };
+
+        process.stdin.on('keypress', onKey);
+    });
+}
+
+async function agentsList() {
+    if (process.stdout.isTTY && !process.env.NON_INTERACTIVE) {
+        await agentsInteractive();
+        return;
+    }
+
     const pad = centerPad();
 
     console.log('');
@@ -2951,7 +3113,7 @@ function agentsList() {
     }
 }
 
-function agentsInfo(name) {
+async function agentsInfo(name) {
     const pad = centerPad();
     const agent = findAgent(name);
 
@@ -3535,14 +3697,14 @@ export async function run(args) {
                 case 'list':
                 case null:
                 case undefined:
-                    agentsList();
+                    await agentsList();
                     break;
                 case 'info':
                     if (!agentName) {
                         console.log(`\n  ${c.red}Error:${c.reset} Agent name required.`);
                         console.log(`  Usage: wtv agents info <name>\n`);
                     } else {
-                        agentsInfo(agentName);
+                        await agentsInfo(agentName);
                     }
                     break;
                 case 'add':
@@ -3580,7 +3742,7 @@ export async function run(args) {
                     break;
                 default:
                     // Assume subcommand is an agent name for quick info
-                    agentsInfo(subcommand);
+                    await agentsInfo(subcommand);
             }
             break;
         }
