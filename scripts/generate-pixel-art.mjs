@@ -43,28 +43,45 @@ async function generatePixelArt(agentName, imageFile) {
         // Ensure height is even because each character covers 2 pixels vertically
         const finalHeight = targetHeight % 2 === 0 ? targetHeight : targetHeight + 1;
 
-        image.resize({ w: targetWidth, h: finalHeight });
+        // Resize using Nearest Neighbor for a "crunchy" pixel-art look
+        image.resize({
+            w: targetWidth,
+            h: finalHeight,
+            interpolation: 'nearestNeighbor'
+        });
 
-        // Force high contrast for that "park caricature" ink look
-        image.contrast(0.2);
+        // High-contrast processing to remove "mushy" grays
+        image.greyscale();
+        image.contrast(0.7); // Punch up the blacks
 
         let ascii = '';
         const RESET = '\x1b[0m';
 
         for (let y = 0; y < image.bitmap.height; y += 2) {
+            let rowEmpty = true;
+            let row = '';
             for (let x = 0; x < image.bitmap.width; x++) {
                 const topPixel = intToRGBA(image.getPixelColor(x, y));
                 const bottomPixel = intToRGBA(image.getPixelColor(x, y + 1));
 
-                // Convert to grayscale
-                const topG = Math.round((topPixel.r + topPixel.g + topPixel.b) / 3);
-                const bottomG = Math.round((bottomPixel.r + bottomPixel.g + bottomPixel.b) / 3);
+                // Posterize to 3 levels: 0 (black), 128 (gray), 255 (white)
+                const quantize = (v) => {
+                    if (v < 80) return 30; // Deep ink
+                    if (v < 180) return 120; // Mid-tone shading
+                    return 255; // White/Background
+                };
 
-                // Foreground = top pixel, Background = bottom pixel
-                // ANSI 24-bit: \x1b[38;2;R;G;Bm (foreground) \x1b[48;2;R;G;Bm (background)
-                ascii += `\x1b[38;2;${topG};${topG};${topG};48;2;${bottomG};${bottomG};${bottomG}m▀${RESET}`;
+                const tG = quantize((topPixel.r + topPixel.g + topPixel.b) / 3);
+                const bG = quantize((bottomPixel.r + bottomPixel.g + bottomPixel.b) / 3);
+
+                if (tG < 200 || bG < 200) rowEmpty = false;
+
+                // ANSI 24-bit half-block
+                row += `\x1b[38;2;${tG};${tG};${tG};48;2;${bG};${bG};${bG}m▀${RESET}`;
             }
-            ascii += '\n';
+            if (!rowEmpty) {
+                ascii += row + '\n';
+            }
         }
 
         updateAgentFile(agentName, ascii);
