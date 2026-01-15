@@ -4,16 +4,16 @@ import fs from 'fs';
 import path from 'path';
 
 const AGENTS = {
-    'moses': 'moses_product_1768512805528.png',
-    'paul': 'paul_masterbuilder_1768512821205.png',
-    'david': 'david_voice_1768512835402.png',
-    'aholiab': 'aholiab_frontend_1768512858411.png',
-    'bezaleel': 'bezaleel_architecture_1768512872786.png',
-    'ezra': 'ezra_qa_1768512887408.png',
-    'hiram': 'hiram_backend_1768512912621.png',
-    'nehemiah': 'nehemiah_security_1768512926292.png',
-    'solomon': 'solomon_data_1768512942023.png',
-    'zerubbabel': 'zerubbabel_devops_1768512958319.png'
+    'moses': 'moses_techno_pattern_1768520008493.png',
+    'paul': 'paul_masterbuilder_hologram_1768520024518.png',
+    'david': 'david_voice_neon_1768520042799.png',
+    'aholiab': 'aholiab_frontend_clarity_1768520056099.png',
+    'bezaleel': 'bezaleel_architect_spirit_1768520071745.png',
+    'ezra': 'ezra_qa_scribe_1768520089245.png',
+    'hiram': 'hiram_backend_forge_1768520105883.png',
+    'nehemiah': 'nehemiah_security_guardian_1768520121577.png',
+    'solomon': 'solomon_data_wisdom_1768520135605.png',
+    'zerubbabel': 'zerubbabel_devops_finisher_1768520150292.png'
 };
 
 const BRAIN_DIR = '/Users/chrishogg/.gemini/antigravity/brain/14635805-b6b5-4657-9057-5286ec00cf8b';
