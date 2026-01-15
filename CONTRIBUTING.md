@@ -1,11 +1,11 @@
-# Contributing to codehogg
+# Contributing to wtv
 
 ## Development Workflow
 
 ### Making Changes
 
 1. **Edit files** in `templates/` (agents, skills) or `src/`
-2. **Test locally** by running `node bin/codehogg.js` commands
+2. **Test locally** by running `node bin/wtv.js` commands
 3. **Commit and push** to GitHub
 
 ```bash
@@ -16,7 +16,7 @@ git push origin main
 
 ### Publishing to npm
 
-npm and GitHub are **separate**. After pushing to GitHub, you must also publish to npm for `npx codehogg` to get the updates.
+npm and GitHub are **separate**. After pushing to GitHub, you must also publish to npm for `npx wtv` to get the updates.
 
 ```bash
 # 1. Bump the version (choose one)
@@ -57,28 +57,28 @@ npm whoami
 ```bash
 # Install locally to test
 cd /path/to/test-project
-node /path/to/codehogg/bin/codehogg.js init
+node /path/to/wtv/bin/wtv.js init
 
 # Or use npm link for development
-cd /path/to/codehogg
+cd /path/to/wtv
 npm link
 
 cd /path/to/test-project
-npx codehogg init
+npx wtv init
 ```
 
 ## Project Structure
 
 ```
-codehogg/
+wtv/
 ├── bin/
-│   └── codehogg.js      # CLI entry point
+│   └── wtv.js           # CLI entry point
 ├── src/
 │   └── cli.js           # CLI implementation
 ├── templates/
-│   ├── agents/          # Claude Code agent templates (29)
-│   ├── skills/          # Skills (43) for Claude/Codex/OpenCode
-│   └── CODEHOGG.md      # Claude Code project guidance
+│   ├── agents/          # Agent templates
+│   ├── skills/          # Skills for Claude/Codex/OpenCode
+│   └── WTV.md           # Claude Code project guidance
 ├── package.json
 ├── README.md
 └── CONTRIBUTING.md      # You are here
@@ -153,4 +153,4 @@ This skill can be invoked via:
 
 ## Questions?
 
-Open an issue at [github.com/christopheraaronhogg/codehogg/issues](https://github.com/christopheraaronhogg/codehogg/issues)
+Open an issue at [github.com/christopheraaronhogg/codehogg/issues](https://github.com/christopheraaronhogg/codehogg/issues) (repo rename pending)

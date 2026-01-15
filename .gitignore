@@ -1,8 +1,13 @@
 audit-reports/
 node_modules/
 package-lock.json
+.tmp/
 
-# Local codehogg installations (generated, not source)
+# Local tool installations (generated, not source)
 .claude/
 .codex/
 .opencode/
+
+# Local WTV project data (generated)
+.wtv/
+.codehogg/

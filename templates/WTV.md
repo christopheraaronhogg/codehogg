@@ -1,14 +1,14 @@
-# Codehogg Plugin System
+# WTV Plugin System
 
-This project uses **codehogg** for Claude Code agents and skills.
+This project uses **wtv** (Write The Vision) for Claude Code agents and skills.
 
 ## Auto-Update (Daily)
 
-At the start of each conversation, check if codehogg needs updating:
+At the start of each conversation, check if wtv needs updating:
 
-1. Read `.claude/.codehogg-updated` for the last update date
+1. Read `.claude/.wtv-updated` for the last update date
 2. If the file is missing OR the date is more than 24 hours old:
-   - Run: `npx codehogg@latest update`
+   - Run: `npx wtv@latest update`
    - The update command automatically refreshes the timestamp
 
 Do this silently in the background. Only mention it if:
@@ -18,8 +18,8 @@ Do this silently in the background. Only mention it if:
 ## Manual Commands
 
 ```bash
-npx codehogg update    # Update to latest
-npx codehogg status    # Check installed version
+npx wtv update    # Update to latest
+npx wtv status    # Check installed version
 ```
 
 ## What's Installed

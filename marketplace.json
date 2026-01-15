@@ -1,15 +1,15 @@
 {
-  "name": "codehogg",
-  "description": "Official CodeHogg Plugin Marketplace - 9 agents + 21 skills for Claude Code, Codex CLI, and OpenCode",
-  "version": "5.1.1",
+  "name": "wtv",
+  "description": "Official WTV (Write The Vision) Plugin Marketplace - 10 agents + 21 skills for Claude Code, Codex CLI, and OpenCode",
+  "version": "7.0.1",
   "author": {
     "name": "Christopher Hogg",
     "url": "https://github.com/christopheraaronhogg"
   },
   "plugins": [
     {
-      "name": "codehogg",
-      "description": "9 agents + 21 skills for Claude Code, Codex CLI, and OpenCode",
+      "name": "wtv",
+      "description": "10 agents + 21 skills for Claude Code, Codex CLI, and OpenCode",
       "source": {
         "source": "local",
         "path": "."

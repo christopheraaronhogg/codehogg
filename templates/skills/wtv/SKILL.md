@@ -1,10 +1,34 @@
 ---
-name: codehogg
-description: Vision-driven development with Masterbuilder coordination. Reads VISION.md, consults artisans for counsel, creates plans with task lists, delegates execution, verifies results.
+name: wtv
+description: Write The Vision (WTV): vision-aligned development with Paul the Masterbuilder and Biblical artisans. Reads VISION.md, gathers counsel, creates plans, delegates execution, verifies results.
 user-invocable: true
 ---
 
-# Codehogg: Vision-Driven Development
+# WTV: Vision-Driven Development
+
+---
+
+## How This Works
+
+**You are inside an AI CLI** (Claude Code, OpenCode, Codex, or Gemini CLI).
+
+**wtv installed this skill and the agents you'll use.** But YOU execute them using your native Task tool to spawn agents in isolated contexts.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    You (AI inside Claude Code, etc.)            │
+│                                                                 │
+│  1. Load this skill (wtv) for methodology                  │
+│  2. Use your native Task tool to spawn artisan agents           │
+│  3. Artisans run in isolated contexts, return results           │
+│  4. You synthesize and report to user                           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**To discover what agents are installed**, run:
+```bash
+npx wtv agents
+```
 
 ---
 
@@ -12,48 +36,48 @@ user-invocable: true
 
 ### The Vision
 
-> "And the LORD answered me, and said, Write the vision, and make it plain upon tables, that he may run that readeth it."
-> — Habakkuk 2:2 (KJV)
+> "And the LORD answered me, and said, Write the vision, and make [it] plain upon tables, that he may run that readeth it."
+> — Habakkuk 2:2 (KJV PCE)
 
 ### The Masterbuilder
 
 > "According to the grace of God which is given unto me, as a wise masterbuilder, I have laid the foundation, and another buildeth thereon. But let every man take heed how he buildeth thereupon."
-> — 1 Corinthians 3:10 (KJV)
+> — 1 Corinthians 3:10 (KJV PCE)
 
 ### The Counsel
 
-> "Where no counsel is, the people fall: but in the multitude of counsellors there is safety."
-> — Proverbs 11:14 (KJV)
+> "Where no counsel [is], the people fall: but in the multitude of counsellers [there is] safety."
+> — Proverbs 11:14 (KJV PCE)
 
-> "Without counsel purposes are disappointed: but in the multitude of counsellors they are established."
-> — Proverbs 15:22 (KJV)
+> "Without counsel purposes are disappointed: but in the multitude of counsellers they are established."
+> — Proverbs 15:22 (KJV PCE)
 
-> "For by wise counsel thou shalt make thy war: and in multitude of counsellors there is safety."
-> — Proverbs 24:6 (KJV)
+> "For by wise counsel thou shalt make thy war: and in multitude of counsellers [there is] safety."
+> — Proverbs 24:6 (KJV PCE)
 
-> "The way of a fool is right in his own eyes: but he that hearkeneth unto counsel is wise."
-> — Proverbs 12:15 (KJV)
+> "The way of a fool [is] right in his own eyes: but he that hearkeneth unto counsel [is] wise."
+> — Proverbs 12:15 (KJV PCE)
 
-> "Ointment and perfume rejoice the heart: so doth the sweetness of a man's friend by hearty counsel."
-> — Proverbs 27:9 (KJV)
+> "Ointment and perfume rejoice the heart: so [doth] the sweetness of a man’s friend by hearty counsel."
+> — Proverbs 27:9 (KJV PCE)
 
 ---
 
 ## When This Skill Activates
 
-- User invokes `/codehogg` (strategic review)
-- User invokes `/codehogg "mission"` (tactical mission)
+- User invokes `/wtv` (strategic review)
+- User invokes `/wtv "mission"` (tactical mission)
 - User asks for vision-aligned development help
 
 ## Two Modes
 
-### Strategic Mode: `/codehogg`
+### Strategic Mode: `/wtv`
 
 No argument. Masterbuilder assesses current state against full vision.
 
 **Output:** Distance-to-vision report by domain, gaps, recommendations.
 
-### Tactical Mode: `/codehogg "mission"`
+### Tactical Mode: `/wtv "mission"`
 
 With argument. Vision provides context, argument provides mission.
 
@@ -69,7 +93,7 @@ With argument. Vision provides context, argument provides mission.
 Read VISION.md from project root.
 
 If missing:
-  → Tell user: "No VISION.md found. Run `codehogg init` to create one."
+  → Tell user: "No VISION.md found. Run `wtv init` to create one."
   → Ask: "Proceed without vision context?"
   → If yes, note: "Operating without vision alignment."
 
@@ -88,14 +112,14 @@ Track which sections are blank.
 
 **Strategic mode (no argument):**
 ```
-/codehogg
+/wtv
 → Mission: "Assess distance-to-vision across all domains"
 → Consult ALL artisans for current state assessment
 ```
 
 **Tactical mode (with argument):**
 ```
-/codehogg "implement OAuth login"
+/wtv "implement OAuth login"
 → Mission: "implement OAuth login"
 → Determine which artisans to consult based on mission scope
 ```
@@ -151,11 +175,11 @@ Create a comprehensive plan that:
 
 ### Task List
 
-#### Security Tasks (assigned to: security-artisan)
+#### Security Tasks (assigned to: nehemiah)
 - [ ] Task 1: [specific, implementable task]
 - [ ] Task 2: [specific, implementable task]
 
-#### Backend Tasks (assigned to: backend-artisan)
+#### Backend Tasks (assigned to: hiram)
 - [ ] Task 3: [specific, implementable task]
 - [ ] Task 4: [specific, implementable task]
 
@@ -222,7 +246,7 @@ As each artisan returns:
 
 ### Step 8: Log and Report
 
-Create log file: `.codehogg/logs/YYYY-MM-DD/<task-id>.md`
+Create log file: `.wtv/logs/YYYY-MM-DD/<task-id>.md`
 
 ```markdown
 # Task: [mission]
@@ -267,18 +291,19 @@ Report to user:
 
 ## Your Artisans
 
-You have 8 domain experts at your disposal:
+You have 9 domain experts at your disposal:
 
 | Artisan | Domain | When to Consult |
 |---------|--------|-----------------|
-| **security-artisan** | Auth, vulnerabilities, secrets, compliance | Auth, data protection, security-sensitive code |
-| **architecture-artisan** | System design, patterns, structure, code quality | Structural changes, refactoring, new patterns |
-| **backend-artisan** | API, services, data access | Server-side code, business logic |
-| **frontend-artisan** | UI, UX, components, accessibility | User interface, interactions |
-| **database-artisan** | Schema, queries, migrations, optimization | Data modeling, storage, performance |
-| **devops-artisan** | CI/CD, infrastructure, deployment, observability | Deployment, infrastructure, monitoring |
-| **qa-artisan** | Testing, quality, reliability | Test coverage, quality assurance |
-| **product-artisan** | Requirements, scope, documentation | Scope clarity, documentation |
+| **nehemiah** | Auth, vulnerabilities, secrets, compliance | Auth, data protection, security-sensitive code |
+| **bezaleel** | System design, patterns, structure, code quality | Structural changes, refactoring, new patterns |
+| **hiram** | API, services, data access | Server-side code, business logic |
+| **aholiab** | UI, UX, components, accessibility | User interface, interactions |
+| **solomon** | Schema, queries, migrations, optimization | Data modeling, storage, performance |
+| **zerubbabel** | CI/CD, infrastructure, deployment, observability | Deployment, infrastructure, monitoring |
+| **ezra** | Testing, quality, reliability | Test coverage, quality assurance |
+| **moses** | Requirements, scope, documentation | Scope clarity, documentation |
+| **david** | Copy, tone, voice | Onboarding, naming, user-facing text |
 
 ---
 
@@ -293,6 +318,7 @@ You have 8 domain experts at your disposal:
 - DevOps: Deployment, infrastructure, CI/CD changes
 - QA: Test coverage needed, quality concerns
 - Product: Scope unclear, requirements ambiguous
+- Voice (David): Tone, onboarding copy, naming clarity
 
 **When to handle solo:**
 - Simple, single-file changes
@@ -330,8 +356,8 @@ Distance-to-vision is measured in bands, not percentages:
 
 **During consultation:**
 ```
-⏳ Consulting security-artisan...
-⏳ Consulting backend-artisan...
+⏳ Consulting nehemiah...
+⏳ Consulting hiram...
 ✓ Counsel received from 3 artisans
 ```
 
@@ -342,10 +368,10 @@ Synthesizing plan from artisan counsel...
 
 **During execution:**
 ```
-⏳ Delegating to security-artisan (2 tasks)...
-⏳ Delegating to backend-artisan (3 tasks)...
-✓ security-artisan: 2/2 tasks complete
-✓ backend-artisan: 3/3 tasks complete
+⏳ Delegating to nehemiah (2 tasks)...
+⏳ Delegating to hiram (3 tasks)...
+✓ nehemiah: 2/2 tasks complete
+✓ hiram: 3/3 tasks complete
 ```
 
 **On completion:**

@@ -1,7 +1,7 @@
 # Vision
 
-> "And the LORD answered me, and said, Write the vision, and make it plain upon tables, that he may run that readeth it."
-> — Habakkuk 2:2 (KJV)
+> "And the LORD answered me, and said, Write the vision, and make [it] plain upon tables, that he may run that readeth it."
+> — Habakkuk 2:2 (KJV PCE)
 
 ## Purpose
 <!-- Who is this for and what does it do? -->

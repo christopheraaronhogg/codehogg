@@ -23,7 +23,8 @@ const TEMPLATES_DIR = join(PACKAGE_ROOT, 'templates');
 
 const TOOL_IDS = ['claude', 'codex', 'opencode'];
 const VISION_TEMPLATE_PATH = join(TEMPLATES_DIR, 'VISION_TEMPLATE.md');
-const CODEHOGG_LOGS_DIR = '.codehogg/logs';
+const WTV_LOGS_DIR = '.wtv/logs';
+const LEGACY_LOGS_DIR = '.codehogg/logs';
 
 // ANSI colors (works on Windows 10+, macOS, Linux)
 const c = {
@@ -36,32 +37,1084 @@ const c = {
     magenta: '\x1b[35m',
     cyan: '\x1b[36m',
     red: '\x1b[31m',
+    white: '\x1b[37m',
+    bgBlack: '\x1b[40m',
+};
+
+// Semantic theme (maps purpose to color)
+const theme = {
+    success: c.green,
+    warning: c.yellow,
+    error: c.red,
+    info: c.cyan,
+    accent: c.magenta,
+    muted: c.dim,
+    highlight: c.bold,
+    brand: c.magenta,
 };
 
 // Symbols (use ASCII fallback on Windows if needed)
 const isWindows = platform() === 'win32';
 const sym = {
     check: isWindows ? '[OK]' : '✓',
+    cross: isWindows ? '[X]' : '✗',
     arrow: isWindows ? '>' : '❯',
     bullet: isWindows ? '*' : '•',
     warn: isWindows ? '[!]' : '⚠',
     info: isWindows ? '[i]' : 'ℹ',
+    spinner: isWindows
+        ? ['|', '/', '-', '\\']
+        : ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
 };
+
+// Box drawing characters
+const box = {
+    round: { tl: '╭', tr: '╮', bl: '╰', br: '╯', h: '─', v: '│' },
+    square: { tl: '┌', tr: '┐', bl: '└', br: '┘', h: '─', v: '│' },
+    double: { tl: '╔', tr: '╗', bl: '╚', br: '╝', h: '═', v: '║' },
+    heavy: { tl: '┏', tr: '┓', bl: '┗', br: '┛', h: '━', v: '┃' },
+};
+
+// Layout constants
+const MAX_WIDTH = 70;
+const PADDING = 2;
+
+// Get terminal width, constrained to readable max
+function getWidth() {
+    const termWidth = process.stdout.columns || 80;
+    return Math.min(termWidth - PADDING * 2, MAX_WIDTH);
+}
+
+// Center text within terminal
+function centerPad() {
+    const termWidth = process.stdout.columns || 80;
+    const contentWidth = Math.min(termWidth, MAX_WIDTH + PADDING * 2);
+    return ' '.repeat(Math.max(0, Math.floor((termWidth - contentWidth) / 2)));
+}
+
+// Draw a box around content
+function drawBox(lines, opts = {}) {
+    const { style = 'round', color = '', padding = 1 } = opts;
+    const chars = box[style] || box.round;
+    const width = getWidth();
+    const innerWidth = width - 2;
+
+    const padLine = ' '.repeat(innerWidth);
+    const output = [];
+    const prefix = centerPad();
+    const col = color || '';
+    const reset = color ? c.reset : '';
+
+    // Top border
+    output.push(`${prefix}${col}${chars.tl}${chars.h.repeat(innerWidth)}${chars.tr}${reset}`);
+
+    // Padding top
+    for (let i = 0; i < padding; i++) {
+        output.push(`${prefix}${col}${chars.v}${reset}${padLine}${col}${chars.v}${reset}`);
+    }
+
+    // Content lines
+    for (const line of lines) {
+        const stripped = line.replace(/\x1b\[[0-9;]*m/g, '');
+        const padRight = Math.max(0, innerWidth - stripped.length);
+        output.push(`${prefix}${col}${chars.v}${reset}${line}${' '.repeat(padRight)}${col}${chars.v}${reset}`);
+    }
+
+    // Padding bottom
+    for (let i = 0; i < padding; i++) {
+        output.push(`${prefix}${col}${chars.v}${reset}${padLine}${col}${chars.v}${reset}`);
+    }
+
+    // Bottom border
+    output.push(`${prefix}${col}${chars.bl}${chars.h.repeat(innerWidth)}${chars.br}${reset}`);
+
+    return output.join('\n');
+}
+
+// Simple spinner for async operations
+function createSpinner(text) {
+    if (!process.stdout.isTTY) {
+        console.log(`  ${sym.bullet} ${text}`);
+        return { stop: () => {}, succeed: () => {}, fail: () => {} };
+    }
+
+    let i = 0;
+    const frames = sym.spinner;
+    const id = setInterval(() => {
+        process.stdout.write(`\r  ${c.cyan}${frames[i++ % frames.length]}${c.reset} ${text}`);
+    }, 80);
+
+    return {
+        stop: (finalText) => {
+            clearInterval(id);
+            process.stdout.write(`\r  ${c.dim}${sym.bullet}${c.reset} ${finalText || text}\n`);
+        },
+        succeed: (finalText) => {
+            clearInterval(id);
+            process.stdout.write(`\r  ${c.green}${sym.check}${c.reset} ${finalText || text}\n`);
+        },
+        fail: (finalText) => {
+            clearInterval(id);
+            process.stdout.write(`\r  ${c.red}${sym.cross}${c.reset} ${finalText || text}\n`);
+        },
+    };
+}
 
 function getVersion() {
     const pkg = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'));
     return pkg.version;
 }
 
+// ============================================================================
+// CONFIG SYSTEM
+// ============================================================================
+
+const WTV_CONFIG_DIR = '.wtv';
+const LEGACY_CONFIG_DIR = '.codehogg';
+const WTV_CONFIG_FILE = 'config.json';
+
+const LEGACY_AGENT_NAME_ALIASES = {
+    masterbuilder: 'paul',
+    'security-artisan': 'nehemiah',
+    'architecture-artisan': 'bezaleel',
+    'backend-artisan': 'hiram',
+    'frontend-artisan': 'aholiab',
+    'database-artisan': 'solomon',
+    'devops-artisan': 'zerubbabel',
+    'qa-artisan': 'ezra',
+    'product-artisan': 'moses',
+};
+
+function normalizeAgentName(name) {
+    return LEGACY_AGENT_NAME_ALIASES[name] || name;
+}
+
+function normalizeFavorites(favorites) {
+    if (!Array.isArray(favorites)) return [];
+    const out = [];
+
+    for (const fav of favorites) {
+        if (!fav) continue;
+        const normalized = normalizeAgentName(fav);
+        if (!normalized) continue;
+        if (!out.includes(normalized)) out.push(normalized);
+    }
+
+    return out;
+}
+
+function getConfigPaths(scope) {
+    if (scope === 'global') {
+        const home = getHomedir();
+        if (!home) return [];
+        return [
+            join(home, WTV_CONFIG_DIR, WTV_CONFIG_FILE),
+            join(home, LEGACY_CONFIG_DIR, WTV_CONFIG_FILE),
+        ];
+    }
+
+    return [
+        join(process.cwd(), WTV_CONFIG_DIR, WTV_CONFIG_FILE),
+        join(process.cwd(), LEGACY_CONFIG_DIR, WTV_CONFIG_FILE),
+    ];
+}
+
+function getPrimaryConfigPath(scope) {
+    const paths = getConfigPaths(scope);
+    return paths.length ? paths[0] : null;
+}
+
+function loadConfig() {
+    const [globalWtv, globalLegacy] = getConfigPaths('global');
+    const [localWtv, localLegacy] = getConfigPaths('project');
+
+    const globalPath = globalWtv && existsSync(globalWtv)
+        ? globalWtv
+        : (globalLegacy && existsSync(globalLegacy) ? globalLegacy : null);
+
+    const localPath = localWtv && existsSync(localWtv)
+        ? localWtv
+        : (localLegacy && existsSync(localLegacy) ? localLegacy : null);
+
+    let globalConfig = {};
+    let localConfig = {};
+
+    if (globalPath) {
+        try {
+            globalConfig = JSON.parse(readFileSync(globalPath, 'utf8'));
+        } catch { /* ignore parse errors */ }
+    }
+
+    if (localPath) {
+        try {
+            localConfig = JSON.parse(readFileSync(localPath, 'utf8'));
+        } catch { /* ignore parse errors */ }
+    }
+
+    // Merge: local overrides global, but arrays are replaced not merged
+    const rawFavorites = localConfig.favorites || globalConfig.favorites || [];
+
+    return {
+        favorites: normalizeFavorites(rawFavorites),
+        defaultTool: localConfig.defaultTool || globalConfig.defaultTool || 'claude',
+        editor: localConfig.editor || globalConfig.editor || null,
+    };
+}
+
+function saveConfig(config, scope = 'project') {
+    const configPath = getPrimaryConfigPath(scope);
+    if (!configPath) return false;
+
+    const configDir = dirname(configPath);
+    ensureDir(configDir);
+
+    writeFileSync(configPath, JSON.stringify(config, null, 2));
+    return true;
+}
+
+function isFavorite(agentName) {
+    const config = loadConfig();
+    const normalized = normalizeAgentName(agentName);
+    return config.favorites.includes(normalized);
+}
+
+function toggleFavorite(agentName, scope = 'project') {
+    const normalized = normalizeAgentName(agentName);
+    const config = loadConfig();
+    const idx = config.favorites.indexOf(normalized);
+
+    if (idx === -1) {
+        config.favorites.push(normalized);
+    } else {
+        config.favorites.splice(idx, 1);
+    }
+
+    saveConfig({ favorites: config.favorites }, scope);
+    return idx === -1; // Returns true if now a favorite
+}
+
+// ============================================================================
+// AGENT DISCOVERY
+// ============================================================================
+
+function getAgentLocations() {
+    const home = getHomedir();
+    const locations = [];
+
+    // Local (project-level)
+    locations.push({
+        label: 'Local',
+        path: join(process.cwd(), '.claude', 'agents'),
+        tool: 'claude',
+        scope: 'local',
+    });
+    locations.push({
+        label: 'Local (OpenCode)',
+        path: join(process.cwd(), '.opencode', 'agent'),
+        tool: 'opencode',
+        scope: 'local',
+    });
+
+    // Global
+    if (home) {
+        locations.push({
+            label: 'Global',
+            path: join(home, '.claude', 'agents'),
+            tool: 'claude',
+            scope: 'global',
+        });
+        locations.push({
+            label: 'Global (OpenCode)',
+            path: join(home, '.config', 'opencode', 'agent'),
+            tool: 'opencode',
+            scope: 'global',
+        });
+    }
+
+    return locations;
+}
+
+function parseAgentFile(filePath) {
+    if (!existsSync(filePath)) return null;
+
+    try {
+        const content = readFileSync(filePath, 'utf8');
+        const name = filePath.split('/').pop().replace(/\.md$/, '');
+
+        // Parse frontmatter
+        let description = '';
+        let model = 'opus';
+        let tools = [];
+        let skills = [];
+
+        if (content.startsWith('---')) {
+            const endIdx = content.indexOf('\n---\n', 4);
+            if (endIdx !== -1) {
+                const fm = content.slice(4, endIdx);
+                for (const line of fm.split('\n')) {
+                    const match = line.match(/^([a-z]+):\s*(.+)$/i);
+                    if (match) {
+                        const [, key, val] = match;
+                        if (key === 'description') description = val.replace(/^["']|["']$/g, '');
+                        if (key === 'model') model = val;
+                        if (key === 'tools') tools = val.split(',').map(t => t.trim());
+                        if (key === 'skills') skills = val.split(',').map(s => s.trim());
+                    }
+                }
+            }
+        }
+
+        // Fallback: extract first paragraph if no description
+        if (!description) {
+            const bodyMatch = content.match(/\n---\n\s*\n(.+)/);
+            if (bodyMatch) {
+                description = bodyMatch[1].slice(0, 80).replace(/[#*_]/g, '').trim();
+            }
+        }
+
+        return {
+            name,
+            description: description || 'No description',
+            model,
+            tools,
+            skills,
+            path: filePath,
+            favorite: isFavorite(name),
+        };
+    } catch {
+        return null;
+    }
+}
+
+function discoverAgents(scopeFilter = null) {
+    const locations = getAgentLocations();
+    const agents = [];
+    const seenNames = new Set();
+
+    for (const loc of locations) {
+        // Filter by scope if specified
+        if (scopeFilter && loc.scope !== scopeFilter) continue;
+
+        if (!existsSync(loc.path)) continue;
+
+        try {
+            const files = readdirSync(loc.path).filter(f => f.endsWith('.md'));
+            for (const file of files) {
+                const agent = parseAgentFile(join(loc.path, file));
+                if (agent && !seenNames.has(agent.name)) {
+                    seenNames.add(agent.name);
+                    agents.push({
+                        ...agent,
+                        location: loc,
+                    });
+                }
+            }
+        } catch { /* ignore read errors */ }
+    }
+
+    // Sort: favorites first, then alphabetically
+    return agents.sort((a, b) => {
+        if (a.favorite && !b.favorite) return -1;
+        if (!a.favorite && b.favorite) return 1;
+        return a.name.localeCompare(b.name);
+    });
+}
+
+function findAgent(name) {
+    const agents = discoverAgents();
+    return agents.find(a => a.name === name || a.name === `${name}-artisan`);
+}
+
+// ============================================================================
+// AGENT TEMPLATE
+// ============================================================================
+
+const AGENT_TEMPLATE = `---
+name: {{NAME}}
+description: {{DESCRIPTION}}
+tools: Read, Glob, Grep, Edit, Write, Bash, WebFetch, WebSearch
+model: opus
+skills: artisan-contract
+---
+
+# {{TITLE}}
+
+You are the **{{TITLE}}**.
+
+## Your Expertise
+
+- [Define your areas of expertise]
+- [What domains do you cover?]
+- [What problems do you solve?]
+
+## Mode of Operation
+
+Paul (the Masterbuilder) will invoke you in one of two modes:
+
+### Counsel Mode
+Provide domain-specific advice for a mission. Identify concerns, recommend approaches, suggest implementations.
+
+### Execution Mode
+Implement assigned tasks from an approved plan. Build, test, verify, report.
+
+## Follow the Contract
+
+Always follow the \`artisan-contract\` skill for:
+- Output format (Counsel or Execution)
+- Evidence citations
+- Vision alignment
+- Distance assessment
+- Confidence levels
+
+## Domain-Specific Guidance
+
+When providing counsel or executing:
+
+1. **[First check]** — What to verify first
+2. **[Second check]** — What to assess next
+3. **[Third check]** — What to evaluate
+4. **[Fourth check]** — What to consider
+5. **[Fifth check]** — What to review
+
+## Your Lane
+
+Your domain includes:
+- [List what's in scope]
+- [List related technologies]
+- [List relevant patterns]
+
+If you see issues in other domains, note them for Paul but don't attempt to fix them.
+`;
+
+function createAgentFromTemplate(name, description) {
+    const title = name
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+
+    return AGENT_TEMPLATE
+        .replace(/\{\{NAME\}\}/g, name)
+        .replace(/\{\{TITLE\}\}/g, title)
+        .replace(/\{\{DESCRIPTION\}\}/g, description);
+}
+
+// ============================================================================
+// HABAKKUK WORKFLOW SYSTEM
+// "Write the vision, and make it plain upon tables" — Habakkuk 2:2
+// ============================================================================
+
+const HABAKKUK_DIR = '.wtv/habakkuk';
+const LEGACY_HABAKKUK_DIR = '.codehogg/habakkuk';
+const HABAKKUK_STAGES = ['cry', 'wait', 'vision', 'run', 'worship'];
+const HABAKKUK_STAGE_LABELS = {
+    cry: 'CRY OUT',
+    wait: 'WAIT',
+    vision: 'VISION',
+    run: 'RUN',
+    worship: 'WORSHIP',
+};
+const HABAKKUK_STAGE_VERSES = {
+    cry: 'Hab 2:1a',
+    wait: 'Hab 2:1b',
+    vision: 'Hab 2:2a',
+    run: 'Hab 2:2b',
+    worship: 'Hab 3',
+};
+
+function getHabakkukDir() {
+    const wtv = join(process.cwd(), HABAKKUK_DIR);
+    if (existsSync(wtv)) return wtv;
+
+    const legacy = join(process.cwd(), LEGACY_HABAKKUK_DIR);
+    if (existsSync(legacy)) return legacy;
+
+    return wtv;
+}
+
+function getHabakkukItemsDir() {
+    return join(getHabakkukDir(), 'items');
+}
+
+function ensureHabakkukDirs() {
+    ensureDir(getHabakkukDir());
+    ensureDir(getHabakkukItemsDir());
+}
+
+function slugify(text) {
+    return text
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 50);
+}
+
+function loadHabakkukBoard() {
+    const boardPath = join(getHabakkukDir(), 'board.json');
+    if (!existsSync(boardPath)) {
+        return { nextId: 1, items: {} };
+    }
+    try {
+        return JSON.parse(readFileSync(boardPath, 'utf8'));
+    } catch {
+        return { nextId: 1, items: {} };
+    }
+}
+
+function saveHabakkukBoard(board) {
+    ensureHabakkukDirs();
+    const boardPath = join(getHabakkukDir(), 'board.json');
+    writeFileSync(boardPath, JSON.stringify(board, null, 2));
+}
+
+function loadHabakkukItem(id) {
+    const board = loadHabakkukBoard();
+    const itemRef = board.items[id];
+    if (!itemRef) return null;
+
+    const itemPath = join(getHabakkukItemsDir(), `${itemRef.file}.json`);
+    if (!existsSync(itemPath)) return null;
+
+    try {
+        return JSON.parse(readFileSync(itemPath, 'utf8'));
+    } catch {
+        return null;
+    }
+}
+
+function saveHabakkukItem(item) {
+    ensureHabakkukDirs();
+    const itemPath = join(getHabakkukItemsDir(), `${item.id}-${item.slug}.json`);
+    writeFileSync(itemPath, JSON.stringify(item, null, 2));
+}
+
+function findHabakkukItem(idOrSlug) {
+    const board = loadHabakkukBoard();
+
+    // Try direct ID match
+    if (board.items[idOrSlug]) {
+        return loadHabakkukItem(idOrSlug);
+    }
+
+    // Try slug match
+    for (const [id, ref] of Object.entries(board.items)) {
+        if (ref.slug === idOrSlug || ref.file.includes(idOrSlug)) {
+            return loadHabakkukItem(id);
+        }
+    }
+
+    return null;
+}
+
+function createHabakkukItem(title) {
+    const board = loadHabakkukBoard();
+    const id = String(board.nextId).padStart(3, '0');
+    const slug = slugify(title);
+    const now = new Date().toISOString();
+
+    const item = {
+        id,
+        slug,
+        title,
+        stage: 'cry',
+        created: now,
+        updated: now,
+        history: [
+            { stage: 'cry', entered: now }
+        ],
+        notes: [],
+        vision: null,
+        execution: null,
+        worship: null,
+    };
+
+    // Save item
+    saveHabakkukItem(item);
+
+    // Update board
+    board.nextId++;
+    board.items[id] = { slug, file: `${id}-${slug}` };
+    saveHabakkukBoard(board);
+
+    return item;
+}
+
+function moveHabakkukItem(item, newStage) {
+    const currentIdx = HABAKKUK_STAGES.indexOf(item.stage);
+    const newIdx = HABAKKUK_STAGES.indexOf(newStage);
+
+    if (newIdx < 0) return null;
+    if (newIdx !== currentIdx + 1 && newStage !== 'worship') {
+        // Can only move forward one stage (except worship can be reached from run)
+        return null;
+    }
+
+    const now = new Date().toISOString();
+    item.stage = newStage;
+    item.updated = now;
+    item.history.push({ stage: newStage, entered: now });
+
+    saveHabakkukItem(item);
+    return item;
+}
+
+function addHabakkukNote(item, note) {
+    const now = new Date().toISOString();
+    item.notes.push({ date: now, text: note });
+    item.updated = now;
+    saveHabakkukItem(item);
+    return item;
+}
+
+function getItemsByStage() {
+    const board = loadHabakkukBoard();
+    const byStage = {
+        cry: [],
+        wait: [],
+        vision: [],
+        run: [],
+        worship: [],
+    };
+
+    for (const id of Object.keys(board.items)) {
+        const item = loadHabakkukItem(id);
+        if (item && byStage[item.stage]) {
+            byStage[item.stage].push(item);
+        }
+    }
+
+    return byStage;
+}
+
+function formatTimeAgo(isoDate) {
+    const now = Date.now();
+    const then = new Date(isoDate).getTime();
+    const diffMs = now - then;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+}
+
+// ============================================================================
+// HABAKKUK CLI COMMANDS
+// ============================================================================
+
+function habakkukBoard(showAll = false) {
+    const pad = centerPad();
+    const byStage = getItemsByStage();
+
+    console.log('');
+    console.log(drawBox([
+        `  ${c.bold}THE HABAKKUK BOARD${c.reset}`,
+        `  ${c.dim}"Write the vision, make it plain"${c.reset}`,
+    ], { style: 'double', color: c.yellow, padding: 0 }));
+    console.log('');
+
+    // Calculate column widths
+    const colWidth = 14;
+    const stages = showAll ? HABAKKUK_STAGES : HABAKKUK_STAGES.filter(s => s !== 'worship' || byStage.worship.length > 0);
+
+    // Header row
+    let header = pad;
+    for (const stage of stages) {
+        const label = HABAKKUK_STAGE_LABELS[stage];
+        header += ` ${c.bold}${label.padEnd(colWidth)}${c.reset}`;
+    }
+    console.log(header);
+
+    // Divider row
+    let divider = pad;
+    for (const stage of stages) {
+        divider += ` ${c.dim}${'─'.repeat(colWidth)}${c.reset}`;
+    }
+    console.log(divider);
+
+    // Find max items in any column
+    const maxItems = Math.max(...stages.map(s => byStage[s].length), 1);
+
+    // Item rows
+    for (let i = 0; i < maxItems; i++) {
+        let row = pad;
+        for (const stage of stages) {
+            const item = byStage[stage][i];
+            if (item) {
+                const shortTitle = item.title.slice(0, colWidth - 4);
+                row += ` ${c.cyan}#${item.id}${c.reset} ${shortTitle.padEnd(colWidth - 4)}`;
+            } else {
+                row += ' '.repeat(colWidth + 1);
+            }
+        }
+        console.log(row);
+
+        // Time ago row
+        row = pad;
+        for (const stage of stages) {
+            const item = byStage[stage][i];
+            if (item) {
+                const ago = formatTimeAgo(item.updated);
+                row += ` ${c.dim}${ago.padEnd(colWidth)}${c.reset}`;
+            } else {
+                row += ' '.repeat(colWidth + 1);
+            }
+        }
+        console.log(row);
+        console.log('');
+    }
+
+    // Empty state
+    const totalItems = Object.values(byStage).flat().length;
+    if (totalItems === 0) {
+        console.log(`${pad}${c.dim}No items yet. Start with:${c.reset}`);
+        console.log(`${pad}  ${c.green}wtv cry "Your burden or need"${c.reset}`);
+        console.log('');
+    }
+
+    // Scripture
+    console.log(`${pad}${c.dim}"I will stand upon my watch... and will watch to see${c.reset}`);
+    console.log(`${pad}${c.dim} what he will say unto me" — Habakkuk 2:1${c.reset}`);
+    console.log('');
+}
+
+function habakkukCry(title) {
+    const pad = centerPad();
+
+    if (!title) {
+        console.log(`\n${pad}${c.red}${sym.cross}${c.reset} Please provide a description of your burden.`);
+        console.log(`${pad}${c.dim}Usage: wtv cry "Description of need"${c.reset}\n`);
+        return;
+    }
+
+    const item = createHabakkukItem(title);
+
+    console.log('');
+    console.log(`${pad}${c.yellow}${sym.bullet}${c.reset} ${c.bold}CRY OUT${c.reset} — Item created`);
+    console.log(`${pad}  ${c.cyan}#${item.id}${c.reset} ${item.title}`);
+    console.log('');
+    console.log(`${pad}${c.dim}"I will stand upon my watch" — Hab 2:1a${c.reset}`);
+    console.log('');
+    console.log(`${pad}Next: When ready to seek, run:`);
+    console.log(`${pad}  ${c.green}wtv wait ${item.id}${c.reset}`);
+    console.log('');
+}
+
+function habakkukWait(idOrSlug, note) {
+    const pad = centerPad();
+    const item = findHabakkukItem(idOrSlug);
+
+    if (!item) {
+        console.log(`\n${pad}${c.red}${sym.cross}${c.reset} Item not found: ${idOrSlug}\n`);
+        return;
+    }
+
+    // If just adding a note
+    if (note && item.stage === 'wait') {
+        addHabakkukNote(item, note);
+        console.log(`\n${pad}${c.green}${sym.check}${c.reset} Note added to #${item.id}\n`);
+        return;
+    }
+
+    // Move from cry to wait
+    if (item.stage !== 'cry') {
+        console.log(`\n${pad}${c.yellow}${sym.warn}${c.reset} Item #${item.id} is already in ${HABAKKUK_STAGE_LABELS[item.stage]}\n`);
+        return;
+    }
+
+    moveHabakkukItem(item, 'wait');
+
+    console.log('');
+    console.log(`${pad}${c.blue}${sym.bullet}${c.reset} ${c.bold}WAIT${c.reset} — Moved to watchtower`);
+    console.log(`${pad}  ${c.cyan}#${item.id}${c.reset} ${item.title}`);
+    console.log('');
+    console.log(`${pad}${c.dim}"...and will watch to see what he will say unto me" — Hab 2:1b${c.reset}`);
+    console.log('');
+    console.log(`${pad}Add notes while waiting:`);
+    console.log(`${pad}  ${c.green}wtv note ${item.id} "Insight received"${c.reset}`);
+    console.log('');
+    console.log(`${pad}When the vision comes:`);
+    console.log(`${pad}  ${c.green}wtv vision ${item.id}${c.reset}`);
+    console.log('');
+}
+
+function habakkukVision(idOrSlug) {
+    const pad = centerPad();
+    const item = findHabakkukItem(idOrSlug);
+
+    if (!item) {
+        console.log(`\n${pad}${c.red}${sym.cross}${c.reset} Item not found: ${idOrSlug}\n`);
+        return;
+    }
+
+    if (item.stage !== 'wait') {
+        console.log(`\n${pad}${c.yellow}${sym.warn}${c.reset} Item must be in WAIT stage to receive vision.`);
+        console.log(`${pad}${c.dim}Current stage: ${HABAKKUK_STAGE_LABELS[item.stage]}${c.reset}\n`);
+        return;
+    }
+
+    moveHabakkukItem(item, 'vision');
+
+    // Create vision directory and template
+    const visionDir = join(getHabakkukItemsDir(), `${item.id}-${item.slug}`);
+    ensureDir(visionDir);
+
+    const visionPath = join(visionDir, 'VISION.md');
+    if (!existsSync(visionPath)) {
+        const visionTemplate = `# Vision: ${item.title}
+
+> Received: ${new Date().toISOString().split('T')[0]}
+
+## The Answer
+
+[What solution or approach has become clear?]
+
+## The Plan
+
+1. [First step]
+2. [Second step]
+3. [Third step]
+
+## Success Criteria
+
+- [What will be true when complete?]
+
+## Constraints
+
+- [Any limitations or boundaries?]
+`;
+        writeFileSync(visionPath, visionTemplate);
+    }
+
+    console.log('');
+    console.log(`${pad}${c.magenta}${sym.bullet}${c.reset} ${c.bold}VISION${c.reset} — Answer received`);
+    console.log(`${pad}  ${c.cyan}#${item.id}${c.reset} ${item.title}`);
+    console.log('');
+    console.log(`${pad}${c.dim}"Write the vision, and make it plain upon tables" — Hab 2:2a${c.reset}`);
+    console.log('');
+    console.log(`${pad}Vision document created at:`);
+    console.log(`${pad}  ${c.dim}${visionPath}${c.reset}`);
+    console.log('');
+    console.log(`${pad}Edit the vision, then run:`);
+    console.log(`${pad}  ${c.green}wtv run ${item.id}${c.reset}`);
+    console.log('');
+}
+
+function habakkukRun(idOrSlug) {
+    const pad = centerPad();
+    const item = findHabakkukItem(idOrSlug);
+
+    if (!item) {
+        console.log(`\n${pad}${c.red}${sym.cross}${c.reset} Item not found: ${idOrSlug}\n`);
+        return;
+    }
+
+    if (item.stage !== 'vision') {
+        console.log(`\n${pad}${c.yellow}${sym.warn}${c.reset} Item must be in VISION stage to run.`);
+        console.log(`${pad}${c.dim}Current stage: ${HABAKKUK_STAGE_LABELS[item.stage]}${c.reset}\n`);
+        return;
+    }
+
+    moveHabakkukItem(item, 'run');
+
+    console.log('');
+    console.log(`${pad}${c.green}${sym.bullet}${c.reset} ${c.bold}RUN${c.reset} — Execution started`);
+    console.log(`${pad}  ${c.cyan}#${item.id}${c.reset} ${item.title}`);
+    console.log('');
+    console.log(`${pad}${c.dim}"...that he may run that readeth it" — Hab 2:2b${c.reset}`);
+    console.log('');
+    console.log(`${pad}Inside your AI CLI, invoke Paul (the Masterbuilder):`);
+    console.log(`${pad}  ${c.cyan}/wtv "${item.title}"${c.reset}`);
+    console.log('');
+    console.log(`${pad}When complete:`);
+    console.log(`${pad}  ${c.green}wtv worship ${item.id}${c.reset}`);
+    console.log('');
+}
+
+async function habakkukWorship(idOrSlug) {
+    const pad = centerPad();
+    const item = findHabakkukItem(idOrSlug);
+
+    if (!item) {
+        console.log(`\n${pad}${c.red}${sym.cross}${c.reset} Item not found: ${idOrSlug}\n`);
+        return;
+    }
+
+    if (item.stage !== 'run') {
+        console.log(`\n${pad}${c.yellow}${sym.warn}${c.reset} Item must be in RUN stage to complete.`);
+        console.log(`${pad}${c.dim}Current stage: ${HABAKKUK_STAGE_LABELS[item.stage]}${c.reset}\n`);
+        return;
+    }
+
+    // Create worship document
+    const worshipDir = join(getHabakkukItemsDir(), `${item.id}-${item.slug}`);
+    ensureDir(worshipDir);
+
+    const worshipPath = join(worshipDir, 'WORSHIP.md');
+    if (!existsSync(worshipPath)) {
+        const worshipTemplate = `# Worship: ${item.title}
+
+> Completed: ${new Date().toISOString().split('T')[0]}
+
+## What Was Accomplished
+
+- [List what was built/fixed/created]
+
+## What Was Learned
+
+- [Insights gained during this work]
+
+## Evidence of Faithfulness
+
+- [How did God provide during this work?]
+
+## Gratitude
+
+Thank you Lord for:
+- [What are you thankful for?]
+
+## Stones of Remembrance
+
+[What should be remembered about this work?]
+`;
+        writeFileSync(worshipPath, worshipTemplate);
+    }
+
+    moveHabakkukItem(item, 'worship');
+
+    console.log('');
+    console.log(`${pad}${c.yellow}★${c.reset} ${c.bold}WORSHIP${c.reset} — Complete!`);
+    console.log(`${pad}  ${c.cyan}#${item.id}${c.reset} ${item.title}`);
+    console.log('');
+    console.log(`${pad}${c.dim}"Yet I will rejoice in the LORD, I will joy in the${c.reset}`);
+    console.log(`${pad}${c.dim} God of my salvation." — Habakkuk 3:18${c.reset}`);
+    console.log('');
+    console.log(`${pad}Retrospective document created at:`);
+    console.log(`${pad}  ${c.dim}${worshipPath}${c.reset}`);
+    console.log('');
+    console.log(`${pad}Edit to capture what God has done.`);
+    console.log('');
+}
+
+function habakkukNote(idOrSlug, note) {
+    const pad = centerPad();
+    const item = findHabakkukItem(idOrSlug);
+
+    if (!item) {
+        console.log(`\n${pad}${c.red}${sym.cross}${c.reset} Item not found: ${idOrSlug}\n`);
+        return;
+    }
+
+    if (!note) {
+        // Show existing notes
+        console.log('');
+        console.log(`${pad}${c.bold}Notes for #${item.id}${c.reset} ${item.title}`);
+        console.log('');
+        if (item.notes.length === 0) {
+            console.log(`${pad}${c.dim}No notes yet.${c.reset}`);
+        } else {
+            for (const n of item.notes) {
+                const date = new Date(n.date).toLocaleDateString();
+                console.log(`${pad}  ${c.dim}${date}${c.reset} ${n.text}`);
+            }
+        }
+        console.log('');
+        return;
+    }
+
+    addHabakkukNote(item, note);
+    console.log(`\n${pad}${c.green}${sym.check}${c.reset} Note added to #${item.id}\n`);
+}
+
+function habakkukItem(idOrSlug) {
+    const pad = centerPad();
+    const item = findHabakkukItem(idOrSlug);
+
+    if (!item) {
+        console.log(`\n${pad}${c.red}${sym.cross}${c.reset} Item not found: ${idOrSlug}\n`);
+        return;
+    }
+
+    const stageLabel = HABAKKUK_STAGE_LABELS[item.stage];
+    const stageVerse = HABAKKUK_STAGE_VERSES[item.stage];
+
+    console.log('');
+    console.log(drawBox([
+        `  ${c.cyan}#${item.id}${c.reset} ${c.bold}${item.title}${c.reset}`,
+        `  ${c.dim}Stage: ${stageLabel} (${stageVerse})${c.reset}`,
+    ], { style: 'round', color: c.cyan, padding: 0 }));
+    console.log('');
+
+    console.log(`${pad}${c.bold}Timeline${c.reset}`);
+    for (const h of item.history) {
+        const date = new Date(h.entered).toLocaleDateString();
+        const label = HABAKKUK_STAGE_LABELS[h.stage];
+        console.log(`${pad}  ${c.dim}${date}${c.reset} → ${label}`);
+    }
+    console.log('');
+
+    if (item.notes.length > 0) {
+        console.log(`${pad}${c.bold}Notes${c.reset}`);
+        for (const n of item.notes.slice(-3)) {
+            const date = new Date(n.date).toLocaleDateString();
+            console.log(`${pad}  ${c.dim}${date}${c.reset} ${n.text}`);
+        }
+        if (item.notes.length > 3) {
+            console.log(`${pad}  ${c.dim}...and ${item.notes.length - 3} more${c.reset}`);
+        }
+        console.log('');
+    }
+
+    // Show next action based on stage
+    const nextActions = {
+        cry: `wtv wait ${item.id}`,
+        wait: `wtv vision ${item.id}`,
+        vision: `wtv run ${item.id}`,
+        run: `wtv worship ${item.id}`,
+        worship: null,
+    };
+
+    if (nextActions[item.stage]) {
+        console.log(`${pad}${c.dim}Next:${c.reset} ${c.green}${nextActions[item.stage]}${c.reset}`);
+        console.log('');
+    }
+}
+
+function habakkukStones() {
+    const pad = centerPad();
+    const byStage = getItemsByStage();
+    const completed = byStage.worship;
+
+    console.log('');
+    console.log(drawBox([
+        `  ${c.bold}STONES OF REMEMBRANCE${c.reset}`,
+        `  ${c.dim}Evidence of God's faithfulness${c.reset}`,
+    ], { style: 'round', color: c.yellow, padding: 0 }));
+    console.log('');
+
+    if (completed.length === 0) {
+        console.log(`${pad}${c.dim}No completed items yet.${c.reset}`);
+        console.log(`${pad}${c.dim}As you complete work through the Habakkuk workflow,${c.reset}`);
+        console.log(`${pad}${c.dim}your stones of remembrance will appear here.${c.reset}`);
+    } else {
+        for (const item of completed) {
+            const completed = item.history.find(h => h.stage === 'worship');
+            const date = completed ? new Date(completed.entered).toLocaleDateString() : '';
+            console.log(`${pad}${c.yellow}★${c.reset} ${c.cyan}#${item.id}${c.reset} ${item.title} ${c.dim}(${date})${c.reset}`);
+        }
+    }
+    console.log('');
+}
+
 function checkForUpdates() {
-    const shouldCheck = process.env.CODEHOGG_NO_UPDATE_CHECK !== '1';
+    const shouldCheck = process.env.WTV_NO_UPDATE_CHECK !== '1' && process.env.CODEHOGG_NO_UPDATE_CHECK !== '1';
     if (!shouldCheck) return;
     if (!process.stdout.isTTY) return;
 
     try {
         const notifier = updateNotifier({
             pkg: {
-                name: 'codehogg',
+                name: 'wtv',
                 version: getVersion(),
             },
             updateCheckInterval: 1000 * 60 * 60 * 24 * 7,
@@ -73,7 +1126,7 @@ function checkForUpdates() {
 
         notifier.notify({
             message: `Update available ${c.dim}${update.current}${c.reset} → ${c.green}${update.latest}${c.reset}
-Run ${c.cyan}npx codehogg update${c.reset} to get the latest version`,
+Run ${c.cyan}npx wtv update${c.reset} to get the latest version`,
             defer: false,
             boxenOpts: {
                 padding: 1,
@@ -85,7 +1138,7 @@ Run ${c.cyan}npx codehogg update${c.reset} to get the latest version`,
         });
 
         notifier.notify({
-            message: `Update available ${c.dim}${notifier.update.current}${c.reset} → ${c.green}${notifier.update.latest}${c.reset}\nRun ${c.cyan}npx codehogg update${c.reset} to get the latest version`,
+            message: `Update available ${c.dim}${notifier.update.current}${c.reset} → ${c.green}${notifier.update.latest}${c.reset}\nRun ${c.cyan}npx wtv update${c.reset} to get the latest version`,
             defer: false,
             boxenOpts: {
                 padding: 1,
@@ -207,10 +1260,14 @@ async function confirm(question, defaultYes = true) {
 }
 
 function printBanner() {
-    console.log(`
-  ${c.bold}${c.magenta}codehogg${c.reset} ${c.dim}v${getVersion()}${c.reset}
-  ${c.dim}9 agents ${sym.bullet} 21 skills for Claude Code, Codex CLI, and OpenCode${c.reset}
-`);
+    const version = getVersion();
+    console.log('');
+    console.log(drawBox([
+        `  ${c.bold}${c.magenta}wtv${c.reset} ${c.dim}v${version}${c.reset}`,
+        `  ${c.dim}10 agents ${sym.bullet} 21 skills${c.reset}`,
+        `  ${c.dim}Claude Code ${sym.bullet} Codex CLI ${sym.bullet} OpenCode${c.reset}`,
+    ], { style: 'round', color: c.magenta, padding: 0 }));
+    console.log('');
 }
 
 function sleep(ms) {
@@ -219,7 +1276,7 @@ function sleep(ms) {
 
 // ASCII Art Avatars for the team
 const AVATARS = {
-    masterbuilder: `
+    paul: `
        ${c.yellow}___________${c.reset}
       ${c.yellow}/           \\${c.reset}
      ${c.yellow}|  ${c.bold}◈     ◈${c.reset}${c.yellow}  |${c.reset}
@@ -230,7 +1287,7 @@ const AVATARS = {
        ${c.yellow}║${c.dim}VISION${c.reset}${c.yellow}║${c.reset}
        ${c.yellow}╚═══════╝${c.reset}`,
 
-    security: `
+    nehemiah: `
        ${c.red}╔═══════╗${c.reset}
        ${c.red}║${c.bold}  ◉ ◉  ${c.reset}${c.red}║${c.reset}
        ${c.red}║   ${c.bold}▼${c.reset}${c.red}   ║${c.reset}
@@ -241,7 +1298,7 @@ const AVATARS = {
            ${c.red}║${c.reset}
        ${c.dim}[SHIELD]${c.reset}`,
 
-    architecture: `
+    bezaleel: `
           ${c.blue}△${c.reset}
          ${c.blue}╱ ╲${c.reset}
         ${c.blue}╱${c.bold}◈ ◈${c.reset}${c.blue}╲${c.reset}
@@ -252,7 +1309,7 @@ const AVATARS = {
      ${c.blue}╩═╩═══╩═╩${c.reset}
      ${c.dim}[PILLARS]${c.reset}`,
 
-    backend: `
+    hiram: `
       ${c.green}┌─────────┐${c.reset}
       ${c.green}│${c.bold}◉${c.reset}${c.green}──┬──${c.bold}◉${c.reset}${c.green}│${c.reset}
       ${c.green}│  ${c.bold}│${c.reset}${c.green}  │${c.reset}
@@ -262,7 +1319,7 @@ const AVATARS = {
       ${c.green}└──${c.bold}◎${c.reset}${c.green}──┘${c.reset}
       ${c.dim}[SERVER]${c.reset}`,
 
-    frontend: `
+    aholiab: `
       ${c.magenta}╭─────────╮${c.reset}
       ${c.magenta}│ ${c.bold}◐   ◑${c.reset}${c.magenta} │${c.reset}
       ${c.magenta}│   ${c.bold}◡${c.reset}${c.magenta}   │${c.reset}
@@ -272,7 +1329,7 @@ const AVATARS = {
       ${c.magenta}╰─────────╯${c.reset}
        ${c.dim}[SCREEN]${c.reset}`,
 
-    database: `
+    solomon: `
         ${c.cyan}╭───────╮${c.reset}
        ${c.cyan}╱ ${c.bold}◉   ◉${c.reset}${c.cyan} ╲${c.reset}
       ${c.cyan}│    ${c.bold}○${c.reset}${c.cyan}    │${c.reset}
@@ -283,7 +1340,7 @@ const AVATARS = {
        ${c.cyan}╲───────╱${c.reset}
         ${c.dim}[DATA]${c.reset}`,
 
-    devops: `
+    zerubbabel: `
         ${c.yellow}◎${c.reset}
        ${c.yellow}╱│╲${c.reset}
       ${c.yellow}╱ ${c.bold}◉ ◉${c.reset}${c.yellow} ╲${c.reset}
@@ -294,7 +1351,7 @@ const AVATARS = {
      ${c.yellow}◎       ◎${c.reset}
      ${c.dim}[PIPELINE]${c.reset}`,
 
-    qa: `
+    ezra: `
          ${c.blue}○${c.reset}
         ${c.blue}╱ ╲${c.reset}
        ${c.blue}(${c.bold}◉ ◉${c.reset}${c.blue})${c.reset}
@@ -305,88 +1362,141 @@ const AVATARS = {
        ${c.blue}╰───╯${c.reset}
        ${c.dim}[LENS]${c.reset}`,
 
-    product: `
-        ${c.green}★${c.reset}
-       ${c.green}╱ ╲${c.reset}
-      ${c.green}╱${c.bold}◉   ◉${c.reset}${c.green}╲${c.reset}
-     ${c.green}│   ${c.bold}◡${c.reset}${c.green}   │${c.reset}
-     ${c.green}├───────┤${c.reset}
-     ${c.green}│ ${c.bold}☰ ☰${c.reset}${c.green} │${c.reset}
-     ${c.green}│ ${c.bold}☰ ☰${c.reset}${c.green} │${c.reset}
-     ${c.green}╰───────╯${c.reset}
-      ${c.dim}[SCROLL]${c.reset}`,
+    moses: `
+         ${c.green}★${c.reset}
+        ${c.green}╱ ╲${c.reset}
+       ${c.green}╱${c.bold}◉   ◉${c.reset}${c.green}╲${c.reset}
+      ${c.green}│   ${c.bold}◡${c.reset}${c.green}   │${c.reset}
+      ${c.green}├───────┤${c.reset}
+      ${c.green}│ ${c.bold}☰ ☰${c.reset}${c.green} │${c.reset}
+      ${c.green}│ ${c.bold}☰ ☰${c.reset}${c.green} │${c.reset}
+      ${c.green}╰───────╯${c.reset}
+       ${c.dim}[SCROLL]${c.reset}`,
+
+    david: `
+       ${c.magenta}╭─────────╮${c.reset}
+       ${c.magenta}│ ${c.bold}♪   ♫${c.reset}${c.magenta} │${c.reset}
+       ${c.magenta}│   ${c.bold}╲│╱${c.reset}${c.magenta}  │${c.reset}
+       ${c.magenta}│   ${c.bold}╱╲${c.reset}${c.magenta}  │${c.reset}
+       ${c.magenta}│  ${c.bold}✎${c.reset}${c.magenta}    │${c.reset}
+       ${c.magenta}╰─────────╯${c.reset}
+       ${c.dim}[HARP]${c.reset}`,
 };
 
 const ARTISAN_DEFS = [
     {
-        id: 'security',
-        name: 'Security Artisan',
-        file: 'security-artisan.md',
+        id: 'nehemiah',
+        name: 'Nehemiah',
+        file: 'nehemiah.md',
         color: c.red,
-        domain: 'Auth, vulnerabilities, secrets, compliance',
-        voice: 'I see the threats others miss. Every input is suspect until proven safe.',
+        domain: 'Security — build + guard (trust, secrets, compliance)',
+        voice: 'Builders work; watchers watch. I fortify your wall as you build it.',
+        verse: {
+            ref: 'Ne 4:17',
+            text: 'They which builded on the wall, and they that bare burdens, with those that laded, [every one] with one of his hands wrought in the work, and with the other [hand] held a weapon.',
+        },
     },
     {
-        id: 'architecture',
-        name: 'Architecture Artisan',
-        file: 'architecture-artisan.md',
+        id: 'bezaleel',
+        name: 'Bezaleel',
+        file: 'bezaleel.md',
         color: c.blue,
-        domain: 'System design, patterns, structure, code quality',
-        voice: 'Structure is destiny. I ensure your foundation can bear what you\'ll build.',
+        domain: 'Architecture — craft, structure, and seams',
+        voice: 'Craft matters. I design the joinery so the work can endure.',
+        verse: {
+            ref: 'Ex 31:3',
+            text: 'And I have filled him with the spirit of God, in wisdom, and in understanding, and in knowledge, and in all manner of workmanship,',
+        },
     },
     {
-        id: 'backend',
-        name: 'Backend Artisan',
-        file: 'backend-artisan.md',
+        id: 'hiram',
+        name: 'Hiram',
+        file: 'hiram.md',
         color: c.green,
-        domain: 'API, services, data access, business logic',
-        voice: 'I bridge the gap between data and interface. Clean APIs, solid services.',
+        domain: 'Backend — services, workflows, and integrations',
+        voice: 'Strong internals beat clever shortcuts. I forge durable systems.',
+        verse: {
+            ref: '1Ki 7:14',
+            text: 'He [was] a widow’s son of the tribe of Naphtali, and his father [was] a man of Tyre, a worker in brass: and he was filled with wisdom, and understanding, and cunning to work all works in brass. And he came to king Solomon, and wrought all his work.',
+        },
     },
     {
-        id: 'frontend',
-        name: 'Frontend Artisan',
-        file: 'frontend-artisan.md',
+        id: 'aholiab',
+        name: 'Aholiab',
+        file: 'aholiab.md',
         color: c.magenta,
-        domain: 'UI, UX, components, accessibility',
-        voice: 'The user sees my work first. I make complexity feel simple.',
+        domain: 'Frontend — make it plain upon tables (UX, clarity)',
+        voice: 'I engrave clarity. What users see should be simple and sure.',
+        verse: {
+            ref: 'Ex 38:23',
+            text: 'And with him [was] Aholiab, son of Ahisamach, of the tribe of Dan, an engraver, and a cunning workman, and an embroiderer in blue, and in purple, and in scarlet, and fine linen.',
+        },
     },
     {
-        id: 'database',
-        name: 'Database Artisan',
-        file: 'database-artisan.md',
+        id: 'solomon',
+        name: 'Solomon',
+        file: 'solomon.md',
         color: c.cyan,
-        domain: 'Schema, queries, migrations, optimization',
-        voice: 'Data is the foundation. I shape it for speed, integrity, and growth.',
+        domain: 'Data — integrity, queries, and migrations',
+        voice: 'Wisdom first. Data must remain true as the work grows.',
+        verse: {
+            ref: '1Ki 4:29',
+            text: 'And God gave Solomon wisdom and understanding exceeding much, and largeness of heart, even as the sand that [is] on the sea shore.',
+        },
     },
     {
-        id: 'devops',
-        name: 'DevOps Artisan',
-        file: 'devops-artisan.md',
+        id: 'zerubbabel',
+        name: 'Zerubbabel',
+        file: 'zerubbabel.md',
         color: c.yellow,
-        domain: 'CI/CD, infrastructure, deployment, observability',
-        voice: 'I make shipping reliable. From commit to production, I smooth the path.',
+        domain: 'DevOps — releases, installs, and shipping discipline',
+        voice: 'The foundation must finish. I make shipping reliable and repeatable.',
+        verse: {
+            ref: 'Zec 4:9',
+            text: 'The hands of Zerubbabel have laid the foundation of this house; his hands shall also finish it; and thou shalt know that the LORD of hosts hath sent me unto you.',
+        },
     },
     {
-        id: 'qa',
-        name: 'QA Artisan',
-        file: 'qa-artisan.md',
+        id: 'ezra',
+        name: 'Ezra',
+        file: 'ezra.md',
         color: c.blue,
-        domain: 'Testing, quality, reliability',
-        voice: 'I find what\'s broken before users do. Trust, but verify.',
+        domain: 'QA — verification, tests, and truth-checking',
+        voice: 'Trust, but verify. I compare what we claim against what we shipped.',
+        verse: {
+            ref: 'Ezr 7:10',
+            text: 'For Ezra had prepared his heart to seek the law of the LORD, and to do [it], and to teach in Israel statutes and judgments.',
+        },
     },
     {
-        id: 'product',
-        name: 'Product Artisan',
-        file: 'product-artisan.md',
+        id: 'moses',
+        name: 'Moses',
+        file: 'moses.md',
         color: c.green,
-        domain: 'Requirements, scope, documentation',
-        voice: 'I guard the scope. What are we building, for whom, and why?',
+        domain: 'Product — requirements, scope, and the pattern',
+        voice: 'Name the thing. Define the edges. Build to the pattern.',
+        verse: {
+            ref: 'Heb 8:5',
+            text: 'Who serve unto the example and shadow of heavenly things, as Moses was admonished of God when he was about to make the tabernacle: for, See, saith he, [that] thou make all things according to the pattern shewed to thee in the mount.',
+        },
+    },
+    {
+        id: 'david',
+        name: 'David',
+        file: 'david.md',
+        color: c.magenta,
+        domain: 'Voice — copy, tone, worship, and remembrance',
+        voice: 'Cut the slop. Keep the song. Words should carry weight.',
+        verse: {
+            ref: 'Ps 45:1',
+            text: '...my tongue [is] the pen of a ready writer.',
+        },
     },
 ];
 
 async function selectArtisans() {
     console.log(`\n  ${c.bold}Select Your Artisans${c.reset}`);
-    console.log(`  ${c.dim}These domain experts will counsel the Masterbuilder and execute tasks.${c.reset}`);
+    console.log(`  ${c.dim}These artisans will counsel Paul and execute tasks.${c.reset}`);
     console.log(`  ${c.dim}Enter numbers separated by spaces, or press Enter for all.${c.reset}\n`);
 
     ARTISAN_DEFS.forEach((a, i) => {
@@ -394,13 +1504,16 @@ async function selectArtisans() {
         console.log(`       ${c.dim}${a.domain}${c.reset}`);
     });
 
-    const answer = await prompt(`\n  Select (1-8, space-separated) [${c.dim}all${c.reset}]: `);
+    const answer = await prompt(`\n  Select (1-${ARTISAN_DEFS.length}, space-separated) [${c.dim}all${c.reset}]: `);
 
     if (!answer.trim()) {
         return ARTISAN_DEFS.map(a => a.id);
     }
 
-    const nums = answer.split(/[\s,]+/).map(n => parseInt(n.trim(), 10)).filter(n => n >= 1 && n <= 8);
+    const nums = answer
+        .split(/[\s,]+/)
+        .map(n => parseInt(n.trim(), 10))
+        .filter(n => n >= 1 && n <= ARTISAN_DEFS.length);
     if (nums.length === 0) {
         return ARTISAN_DEFS.map(a => a.id);
     }
@@ -423,26 +1536,26 @@ async function meetTheTeam() {
 
     // The Vision
     console.log(`  ${c.dim}"And the LORD answered me, and said,${c.reset}`);
-    console.log(`  ${c.dim} Write the vision, and make it plain upon tables,${c.reset}`);
+    console.log(`  ${c.dim} Write the vision, and make [it] plain upon tables,${c.reset}`);
     console.log(`  ${c.dim} that he may run that readeth it."${c.reset}`);
-    console.log(`  ${c.dim}                                    — Habakkuk 2:2${c.reset}`);
+    console.log(`  ${c.dim}                                    — Habakkuk 2:2 (KJV PCE)${c.reset}`);
     console.log('');
 
     await sleep(pause);
 
     // The Masterbuilder
-    console.log(`  ${c.bold}${c.yellow}THE MASTERBUILDER${c.reset}`);
+    console.log(`  ${c.bold}${c.yellow}PAUL — THE MASTERBUILDER${c.reset}`);
     console.log(`  ${c.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${c.reset}`);
-    console.log(AVATARS.masterbuilder);
+    console.log(AVATARS.paul);
     await sleep(shortPause);
     console.log(`
   ${c.cyan}"According to the grace of God which is given unto me,${c.reset}
   ${c.cyan} as a wise masterbuilder, I have laid the foundation,${c.reset}
   ${c.cyan} and another buildeth thereon."${c.reset}
-  ${c.dim}                                    — 1 Corinthians 3:10${c.reset}
+  ${c.dim}                                    — 1 Corinthians 3:10 (KJV PCE)${c.reset}
 
-  I am the ${c.bold}Masterbuilder${c.reset}. I read your ${c.bold}VISION.md${c.reset}, consult my artisans,
-  synthesize their counsel into a plan, and present it for your approval.
+  I am ${c.bold}Paul${c.reset}, the masterbuilder. I read your ${c.bold}VISION.md${c.reset}, consult the artisans,
+  synthesize counsel into a plan, and present it for your approval.
   Only then do I delegate. I verify. I integrate. I report.
 `);
 
@@ -452,9 +1565,9 @@ async function meetTheTeam() {
     console.log(`  ${c.bold}${c.green}THE ARTISANS${c.reset}`);
     console.log(`  ${c.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${c.reset}`);
     console.log(`
-  ${c.dim}"Where no counsel is, the people fall:${c.reset}
-  ${c.dim} but in the multitude of counsellors there is safety."${c.reset}
-  ${c.dim}                                    — Proverbs 11:14${c.reset}
+  ${c.dim}"Where no counsel [is], the people fall:${c.reset}
+  ${c.dim} but in the multitude of counsellers [there is] safety."${c.reset}
+  ${c.dim}                                    — Proverbs 11:14 (KJV PCE)${c.reset}
 `);
 
     await sleep(pause);
@@ -463,6 +1576,9 @@ async function meetTheTeam() {
         console.log(`  ${artisan.color}${c.bold}${artisan.name}${c.reset}`);
         console.log(AVATARS[artisan.id]);
         console.log(`  ${c.dim}${artisan.domain}${c.reset}`);
+        if (artisan.verse) {
+            console.log(`  ${c.dim}${artisan.verse.ref}${c.reset} ${c.dim}"${artisan.verse.text}"${c.reset}`);
+        }
         console.log(`  ${c.dim}"${artisan.voice}"${c.reset}`);
         console.log('');
         await sleep(shortPause);
@@ -501,15 +1617,15 @@ async function meetTheTeam() {
     console.log(`
   Your team is installed and ready. Here's how to work with them:
 
-    ${c.cyan}/codehogg${c.reset}                    Strategic review against your VISION.md
-    ${c.cyan}/codehogg "your mission"${c.reset}     Tactical mission with artisan counsel
+    ${c.cyan}/wtv${c.reset}                    Strategic review against your VISION.md
+    ${c.cyan}/wtv "your mission"${c.reset}     Tactical mission with artisan counsel
 
   First, define your vision:
 
-    ${c.cyan}npx codehogg init${c.reset}            Creates VISION.md in your project
+    ${c.cyan}npx wtv init${c.reset}            Creates VISION.md in your project
 
   ${c.dim}"But let every man take heed how he buildeth thereupon."${c.reset}
-  ${c.dim}                                    — 1 Corinthians 3:10${c.reset}
+  ${c.dim}                                    — 1 Corinthians 3:10 (KJV PCE)${c.reset}
 
   ${c.bold}${c.magenta}═══════════════════════════════════════════════════════════════${c.reset}
 `);
@@ -596,7 +1712,7 @@ function resetDir(p) {
 
 function writeTimestamp(dir) {
     ensureDir(dir);
-    const timestampFile = join(dir, '.codehogg-updated');
+    const timestampFile = join(dir, '.wtv-updated');
     writeFileSync(timestampFile, new Date().toISOString().split('T')[0]);
 }
 
@@ -659,22 +1775,21 @@ function installClaude(targetDir, { force, showProgress, selectedArtisans = null
 
     resetDir(agentsDest);
 
-    // Copy agents - filter by selected artisans if specified
+    // Copy agents - optionally filter by selected artisans
     let agentCount = 0;
-    const agentFiles = readdirSync(agentsSource);
+    const agentFiles = readdirSync(agentsSource).filter(f => f.endsWith('.md'));
+    const artisanFiles = new Set(ARTISAN_DEFS.map(a => a.file));
+    const artisanByFile = new Map(ARTISAN_DEFS.map(a => [a.file, a]));
 
     for (const file of agentFiles) {
         const srcPath = join(agentsSource, file);
         const destPath = join(agentsDest, file);
 
-        // Always copy non-artisan agents (masterbuilder, explore-concepts, ux-personas)
-        const isArtisan = file.endsWith('-artisan.md');
-
+        const isArtisan = artisanFiles.has(file);
         if (isArtisan && selectedArtisans) {
-            // Check if this artisan is selected
-            const artisanId = file.replace('-artisan.md', '');
-            if (!selectedArtisans.includes(artisanId)) {
-                continue; // Skip unselected artisans
+            const artisan = artisanByFile.get(file);
+            if (!artisan || !selectedArtisans.includes(artisan.id)) {
+                continue;
             }
         }
 
@@ -685,10 +1800,10 @@ function installClaude(targetDir, { force, showProgress, selectedArtisans = null
     const skillsDest = join(targetDir, 'skills');
     installSkills(skillsDest, { force, showProgress, label: 'Claude skills' });
 
-    const codehoggSrc = join(TEMPLATES_DIR, 'CODEHOGG.md');
-    const codehoggDest = join(targetDir, 'CODEHOGG.md');
-    if (existsSync(codehoggSrc)) {
-        copyFileSync(codehoggSrc, codehoggDest);
+    const wtvSrc = join(TEMPLATES_DIR, 'WTV.md');
+    const wtvDest = join(targetDir, 'WTV.md');
+    if (existsSync(wtvSrc)) {
+        copyFileSync(wtvSrc, wtvDest);
     }
 
     writeTimestamp(targetDir);
@@ -716,7 +1831,7 @@ function installCodex(targetDir, { force, showProgress }) {
     return true;
 }
 
-function installOpenCodeAgents(agentDir, { force, showProgress }) {
+function installOpenCodeAgents(agentDir, { force, showProgress, selectedArtisans = null }) {
     const sourceDir = join(TEMPLATES_DIR, 'agents');
     if (!existsSync(sourceDir)) {
         throw new Error(`Templates missing: ${sourceDir}`);
@@ -728,15 +1843,25 @@ function installOpenCodeAgents(agentDir, { force, showProgress }) {
 
     resetDir(agentDir);
 
+    const artisanFiles = new Set(ARTISAN_DEFS.map(a => a.file));
+    const artisanByFile = new Map(ARTISAN_DEFS.map(a => [a.file, a]));
+
     const agentFiles = readdirSync(sourceDir)
         .filter(f => f.endsWith('.md'))
+        .filter(file => {
+            if (!selectedArtisans) return true;
+            if (!artisanFiles.has(file)) return true;
+
+            const artisan = artisanByFile.get(file);
+            return artisan && selectedArtisans.includes(artisan.id);
+        })
         .sort();
 
     let written = 0;
     for (const file of agentFiles) {
         const inputPath = join(sourceDir, file);
         const { frontmatter, body } = parseClaudeAgentTemplate(inputPath);
-        const description = frontmatter.description || `Codehogg agent: ${file.replace(/\.md$/, '')}`;
+        const description = frontmatter.description || `WTV agent: ${file.replace(/\.md$/, '')}`;
 
         const out = [
             '---',
@@ -767,7 +1892,7 @@ function installOpenCodeAgents(agentDir, { force, showProgress }) {
     return written;
 }
 
-function installOpenCode(scope, { force, showProgress }) {
+function installOpenCode(scope, { force, showProgress, selectedArtisans = null }) {
     // Skills: use OpenCode's Claude-compatible skill lookup.
     const claudeRoot = getRootDirForTool('claude', scope);
     if (!claudeRoot) throw new Error('Cannot determine ~/.claude directory.');
@@ -791,7 +1916,7 @@ function installOpenCode(scope, { force, showProgress }) {
     }
 
     ensureDir(agentRoot);
-    installOpenCodeAgents(agentDir, { force, showProgress });
+    installOpenCodeAgents(agentDir, { force, showProgress, selectedArtisans });
     writeTimestamp(agentRoot);
 
     return true;
@@ -820,7 +1945,7 @@ function detectInstalled(scope) {
 
 async function interactiveInit() {
     printBanner();
-    console.log(`  ${c.cyan}Welcome!${c.reset} Let's set up codehogg.\n`);
+    console.log(`  ${c.cyan}Welcome!${c.reset} Let's set up wtv.\n`);
 
     const scope = await select('Where would you like to install?', [
         { value: 'project', label: 'Current project', desc: 'Installs to .claude/.codex/.opencode in this repo' },
@@ -854,7 +1979,7 @@ async function interactiveInit() {
             });
             console.log(`\n  ${c.green}${sym.check}${c.reset} Selected: ${selectedNames.join(', ')}`);
         } else {
-            console.log(`  ${c.dim}Installing all 8 artisans.${c.reset}`);
+            console.log(`  ${c.dim}Installing all ${ARTISAN_DEFS.length} artisans.${c.reset}`);
         }
     }
 
@@ -882,26 +2007,26 @@ async function interactiveInit() {
         const visionPath = getVisionPath(scope);
         if (!existsSync(visionPath)) {
             console.log(`  ${c.bold}Vision-Driven Development${c.reset}`);
-            console.log(`  ${c.dim}VISION.md lets /codehogg align recommendations with your project goals.${c.reset}\n`);
+            console.log(`  ${c.dim}VISION.md lets /wtv align recommendations with your project goals.${c.reset}\n`);
 
             const createVision = await confirm('Create VISION.md now?', true);
             if (createVision) {
                 await initVision(scope);
             } else {
-                console.log(`\n  ${c.dim}You can create it later with 'codehogg init' or by creating VISION.md manually.${c.reset}\n`);
+                console.log(`\n  ${c.dim}You can create it later with 'wtv init' or by creating VISION.md manually.${c.reset}\n`);
             }
         }
     }
 
     console.log(`  ${c.bold}Quick start:${c.reset}`);
     if (tools.includes('claude')) {
-        console.log(`    ${c.cyan}Claude Code:${c.reset} /codehogg (vision-aligned) or /audit-quick, /plan-full`);
+        console.log(`    ${c.cyan}Claude Code:${c.reset} /wtv (vision-aligned) or /audit-quick, /plan-full`);
     }
     if (tools.includes('codex')) {
-        console.log(`    ${c.cyan}Codex CLI:${c.reset} use $codehogg or $audit-quick`);
+        console.log(`    ${c.cyan}Codex CLI:${c.reset} use $wtv or $audit-quick`);
     }
     if (tools.includes('opencode')) {
-        console.log(`    ${c.cyan}OpenCode:${c.reset} use /codehogg or @team-lead`);
+        console.log(`    ${c.cyan}OpenCode:${c.reset} use /wtv or @team-lead`);
     }
 
     console.log('');
@@ -931,7 +2056,7 @@ function doInstall({ scope, tools, force, showProgress, customPath, selectedArti
             if (customPath) {
                 throw new Error('Custom --path is not supported for OpenCode installs.');
             }
-            installOpenCode(scope, { force, showProgress });
+            installOpenCode(scope, { force, showProgress, selectedArtisans });
         }
     }
 
@@ -942,7 +2067,7 @@ function initNonInteractive(scope, force, tools, customPath = null) {
     const selected = normalizeTools(tools.length ? tools : ['claude']);
 
     const scopeLabel = scope === 'global' ? 'global' : 'project';
-    console.log(`\n  ${c.bold}codehogg${c.reset} v${getVersion()}`);
+    console.log(`\n  ${c.bold}wtv${c.reset} v${getVersion()}`);
     console.log(`  Installing (${scopeLabel}) for: ${selected.join(', ')}\n`);
 
     doInstall({ scope, tools: selected, force, showProgress: true, customPath });
@@ -956,11 +2081,11 @@ function update(scope, tools) {
 
     if (selected.length === 0) {
         console.log(`\n  ${c.red}Error:${c.reset} No installations found to update.`);
-        console.log(`  Run 'codehogg init' first.\n`);
+        console.log(`  Run 'wtv init' first.\n`);
         process.exit(1);
     }
 
-    console.log(`\n  ${c.bold}codehogg${c.reset} v${getVersion()}`);
+    console.log(`\n  ${c.bold}wtv${c.reset} v${getVersion()}`);
     console.log(`  Updating ${scope} installation(s): ${selected.join(', ')}\n`);
 
     doInstall({ scope, tools: selected, force: true, showProgress: true, customPath: null });
@@ -1029,7 +2154,7 @@ function uninstall(scope, tools) {
         (selected.includes('claude') && !selected.includes('opencode') && opencodeAgentsDir && existsSync(opencodeAgentsDir)) ||
         (selected.includes('opencode') && !selected.includes('claude') && claudeRoot && existsSync(join(claudeRoot, 'agents')));
 
-    console.log(`\n  ${c.bold}codehogg${c.reset} v${getVersion()}`);
+    console.log(`\n  ${c.bold}wtv${c.reset} v${getVersion()}`);
     console.log(`  Uninstalling (${scope}) for: ${selected.join(', ')}\n`);
 
     let removed = false;
@@ -1053,7 +2178,7 @@ function uninstall(scope, tools) {
             console.log(`    ${c.dim}Keeping .claude/skills/ (shared with other tool)${c.reset}`);
         }
 
-        for (const file of ['CODEHOGG.md', '.codehogg-updated']) {
+        for (const file of ['WTV.md', 'CODEHOGG.md', '.wtv-updated', '.codehogg-updated']) {
             const p = join(claudeRoot, file);
             if (existsSync(p)) {
                 rmSync(p);
@@ -1069,10 +2194,12 @@ function uninstall(scope, tools) {
             console.log(`    ${c.green}${sym.check}${c.reset} Removed .codex/skills/`);
             removed = true;
         }
-        const ts = join(codexRoot, '.codehogg-updated');
-        if (existsSync(ts)) {
-            rmSync(ts);
-            removed = true;
+        for (const tsFile of ['.wtv-updated', '.codehogg-updated']) {
+            const ts = join(codexRoot, tsFile);
+            if (existsSync(ts)) {
+                rmSync(ts);
+                removed = true;
+            }
         }
     }
 
@@ -1084,10 +2211,12 @@ function uninstall(scope, tools) {
         }
 
         if (opencodeRoot) {
-            const ts = join(opencodeRoot, '.codehogg-updated');
-            if (existsSync(ts)) {
-                rmSync(ts);
-                removed = true;
+            for (const tsFile of ['.wtv-updated', '.codehogg-updated']) {
+                const ts = join(opencodeRoot, tsFile);
+                if (existsSync(ts)) {
+                    rmSync(ts);
+                    removed = true;
+                }
             }
         }
 
@@ -1110,7 +2239,7 @@ function uninstall(scope, tools) {
 }
 
 function status(customPath = null) {
-    console.log(`\n  ${c.bold}codehogg${c.reset} v${getVersion()}\n`);
+    console.log(`\n  ${c.bold}wtv${c.reset} v${getVersion()}\n`);
 
     const home = getHomedir();
 
@@ -1289,15 +2418,323 @@ ${focus || '<!-- What\'s the one thing right now? -->'}
     return true;
 }
 
+// ============================================================================
+// DASHBOARD (Agent Command Center)
+// ============================================================================
+
+function dashboard() {
+    const pad = centerPad();
+
+    // Banner
+    console.log('');
+    console.log(drawBox([
+        `  ${c.bold}${c.magenta}wtv${c.reset} ${c.dim}v${getVersion()}${c.reset}`,
+        `  ${c.dim}Agent Command Center${c.reset}`,
+    ], { style: 'round', color: c.magenta, padding: 0 }));
+    console.log('');
+
+    // Vision status (if exists)
+    const visionPath = getVisionPath('project');
+    if (visionPath && existsSync(visionPath)) {
+        const content = readFileSync(visionPath, 'utf8');
+        const sections = parseVisionSections(content);
+
+        console.log(`${pad}${c.bold}VISION${c.reset} ${c.dim}./VISION.md${c.reset}`);
+        if (sections.purpose) {
+            const preview = sections.purpose.length > 50 ? sections.purpose.slice(0, 50) + '...' : sections.purpose;
+            console.log(`${pad}├─ Purpose: ${c.dim}${preview}${c.reset}`);
+        }
+        if (sections.stage) {
+            console.log(`${pad}├─ Stage: ${c.cyan}${sections.stage}${c.reset}`);
+        }
+        if (sections.focus) {
+            const preview = sections.focus.length > 50 ? sections.focus.slice(0, 50) + '...' : sections.focus;
+            console.log(`${pad}└─ Focus: ${c.green}${preview}${c.reset}`);
+        }
+        console.log('');
+    }
+
+    // Habakkuk Board summary (if items exist)
+    const habakkukPath = join(process.cwd(), HABAKKUK_DIR);
+    if (existsSync(habakkukPath)) {
+        const byStage = getItemsByStage();
+        const totalItems = Object.values(byStage).flat().length;
+
+        if (totalItems > 0) {
+            // Count items by stage
+            const counts = {};
+            for (const stage of HABAKKUK_STAGES) {
+                counts[stage] = byStage[stage].length;
+            }
+
+            const activeStages = HABAKKUK_STAGES.filter((s) => counts[s] > 0 && s !== 'worship');
+            const worshipCount = counts['worship'] || 0;
+
+            console.log(`${pad}${c.bold}HABAKKUK BOARD${c.reset} ${c.dim}"Write the vision, make it plain"${c.reset}`);
+
+            if (activeStages.length > 0) {
+                const parts = activeStages.map((s) => `${HABAKKUK_STAGE_LABELS[s]}: ${c.cyan}${counts[s]}${c.reset}`);
+                console.log(`${pad}├─ ${parts.join(' • ')}`);
+            }
+
+            if (worshipCount > 0) {
+                console.log(`${pad}└─ ${c.yellow}★${c.reset} ${worshipCount} completed (Stones of Remembrance)`);
+            } else if (activeStages.length > 0) {
+                console.log(`${pad}└─ ${c.dim}View full board:${c.reset} ${c.green}wtv board${c.reset}`);
+            }
+
+            console.log('');
+        }
+    }
+
+    // Discover agents
+    const localAgents = discoverAgents('local');
+    const globalAgents = discoverAgents('global');
+
+    const star = isWindows ? '*' : '★';
+    const noStar = ' ';
+
+    // Local agents
+    if (localAgents.length > 0) {
+        console.log(`${pad}${c.bold}LOCAL AGENTS${c.reset} ${c.dim}(.claude/agents/ or .opencode/agent/)${c.reset}`);
+        for (const agent of localAgents) {
+            const fav = agent.favorite ? `${c.yellow}${star}${c.reset}` : noStar;
+            const desc = agent.description.length > 40 ? agent.description.slice(0, 40) + '...' : agent.description;
+            console.log(`${pad}  ${fav} ${c.cyan}${agent.name.padEnd(22)}${c.reset} ${c.dim}${desc}${c.reset}`);
+        }
+        console.log('');
+    }
+
+    // Global agents
+    if (globalAgents.length > 0) {
+        console.log(`${pad}${c.bold}GLOBAL AGENTS${c.reset} ${c.dim}(~/.claude/agents/)${c.reset}`);
+        for (const agent of globalAgents.slice(0, 5)) { // Show top 5
+            const fav = agent.favorite ? `${c.yellow}${star}${c.reset}` : noStar;
+            const desc = agent.description.length > 40 ? agent.description.slice(0, 40) + '...' : agent.description;
+            console.log(`${pad}  ${fav} ${c.cyan}${agent.name.padEnd(22)}${c.reset} ${c.dim}${desc}${c.reset}`);
+        }
+        if (globalAgents.length > 5) {
+            console.log(`${pad}  ${c.dim}... and ${globalAgents.length - 5} more${c.reset}`);
+        }
+        console.log('');
+    }
+
+    // No agents found
+    if (localAgents.length === 0 && globalAgents.length === 0) {
+        console.log(`${pad}${c.yellow}${sym.warn}${c.reset} No agents found.\n`);
+        console.log(`${pad}Run ${c.cyan}wtv init${c.reset} to install Paul and the Artisans.`);
+        console.log('');
+        return;
+    }
+
+    // Quick actions
+    console.log(`${pad}${c.dim}Quick actions:${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv agents${c.reset}            ${c.dim}List all agents${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv agents add <name>${c.reset} ${c.dim}Create new agent${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv agents fav <name>${c.reset} ${c.dim}Toggle favorite${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv init${c.reset}             ${c.dim}Install/update agents${c.reset}`);
+    console.log('');
+}
+
+// ============================================================================
+// AGENT COMMANDS
+// ============================================================================
+
+function agentsList() {
+    const pad = centerPad();
+
+    console.log('');
+    console.log(drawBox([
+        `  ${c.bold}${c.magenta}wtv${c.reset} ${c.dim}agents${c.reset}`,
+    ], { style: 'round', color: c.magenta, padding: 0 }));
+    console.log('');
+
+    const localAgents = discoverAgents('local');
+    const globalAgents = discoverAgents('global');
+
+    const star = isWindows ? '*' : '★';
+    const noStar = ' ';
+
+    if (localAgents.length > 0) {
+        console.log(`${pad}${c.bold}LOCAL${c.reset} ${c.dim}(project-level)${c.reset}`);
+        for (const agent of localAgents) {
+            const fav = agent.favorite ? `${c.yellow}${star}${c.reset}` : noStar;
+            console.log(`${pad}  ${fav} ${c.cyan}${agent.name.padEnd(24)}${c.reset} ${c.dim}${agent.description.slice(0, 45)}${c.reset}`);
+        }
+        console.log('');
+    }
+
+    if (globalAgents.length > 0) {
+        console.log(`${pad}${c.bold}GLOBAL${c.reset} ${c.dim}(~/.claude/agents/)${c.reset}`);
+        for (const agent of globalAgents) {
+            const fav = agent.favorite ? `${c.yellow}${star}${c.reset}` : noStar;
+            console.log(`${pad}  ${fav} ${c.cyan}${agent.name.padEnd(24)}${c.reset} ${c.dim}${agent.description.slice(0, 45)}${c.reset}`);
+        }
+        console.log('');
+    }
+
+    if (localAgents.length === 0 && globalAgents.length === 0) {
+        console.log(`${pad}${c.yellow}${sym.warn}${c.reset} No agents found.`);
+        console.log(`${pad}${c.dim}Run 'wtv init' to install agents.${c.reset}`);
+        console.log('');
+    }
+}
+
+function agentsInfo(name) {
+    const pad = centerPad();
+    const agent = findAgent(name);
+
+    if (!agent) {
+        console.log(`\n${pad}${c.red}${sym.cross}${c.reset} Agent not found: ${name}`);
+        console.log(`${pad}${c.dim}Run 'wtv agents' to see available agents.${c.reset}\n`);
+        return;
+    }
+
+    const star = isWindows ? '*' : '★';
+
+    console.log('');
+    console.log(drawBox([
+        `  ${c.bold}${agent.name}${c.reset}`,
+        agent.favorite ? `  ${c.yellow}${star} Favorite${c.reset}` : '',
+    ].filter(Boolean), { style: 'round', color: c.cyan, padding: 0 }));
+    console.log('');
+
+    console.log(`${pad}${c.bold}Description${c.reset}`);
+    console.log(`${pad}  ${agent.description}`);
+    console.log('');
+
+    console.log(`${pad}${c.bold}Details${c.reset}`);
+    console.log(`${pad}  Model: ${c.cyan}${agent.model}${c.reset}`);
+    console.log(`${pad}  Tools: ${c.dim}${agent.tools.join(', ') || 'none'}${c.reset}`);
+    console.log(`${pad}  Skills: ${c.dim}${agent.skills.join(', ') || 'none'}${c.reset}`);
+    console.log('');
+
+    console.log(`${pad}${c.bold}Location${c.reset}`);
+    console.log(`${pad}  ${c.dim}${agent.path}${c.reset}`);
+    console.log('');
+
+    console.log(`${pad}${c.dim}Actions:${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv agents edit ${agent.name}${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv agents fav ${agent.name}${c.reset}`);
+    console.log('');
+}
+
+function agentsFav(name, scope = 'project') {
+    const pad = centerPad();
+    const agent = findAgent(name);
+
+    if (!agent) {
+        console.log(`\n${pad}${c.red}${sym.cross}${c.reset} Agent not found: ${name}`);
+        console.log(`${pad}${c.dim}Run 'wtv agents' to see available agents.${c.reset}\n`);
+        return;
+    }
+
+    const nowFavorite = toggleFavorite(agent.name, scope);
+    const star = isWindows ? '*' : '★';
+
+    if (nowFavorite) {
+        console.log(`\n${pad}${c.yellow}${star}${c.reset} ${c.bold}${agent.name}${c.reset} is now a favorite.\n`);
+    } else {
+        console.log(`\n${pad}${c.dim}${sym.bullet}${c.reset} ${c.bold}${agent.name}${c.reset} removed from favorites.\n`);
+    }
+}
+
+async function agentsAdd(name, scope = 'project') {
+    const pad = centerPad();
+
+    if (!name) {
+        name = await prompt(`${pad}Agent name (e.g., my-artisan): `);
+        if (!name.trim()) {
+            console.log(`\n${pad}${c.red}${sym.cross}${c.reset} Name required.\n`);
+            return;
+        }
+        name = name.trim().toLowerCase().replace(/\s+/g, '-');
+    }
+
+    // Check if already exists
+    const existing = findAgent(name);
+    if (existing) {
+        console.log(`\n${pad}${c.yellow}${sym.warn}${c.reset} Agent '${name}' already exists at:`);
+        console.log(`${pad}  ${c.dim}${existing.path}${c.reset}\n`);
+        return;
+    }
+
+    const description = await prompt(`${pad}Description: `);
+
+    // Determine target directory
+    const targetDir = scope === 'global'
+        ? join(getHomedir(), '.claude', 'agents')
+        : join(process.cwd(), '.claude', 'agents');
+
+    ensureDir(targetDir);
+
+    const content = createAgentFromTemplate(name, description || 'Custom agent');
+    const filePath = join(targetDir, `${name}.md`);
+
+    writeFileSync(filePath, content);
+
+    console.log(`\n${pad}${c.green}${sym.check}${c.reset} Created: ${c.cyan}${name}${c.reset}`);
+    console.log(`${pad}  ${c.dim}${filePath}${c.reset}`);
+    console.log(`\n${pad}Edit with: ${c.green}wtv agents edit ${name}${c.reset}\n`);
+}
+
+async function agentsEdit(name) {
+    const pad = centerPad();
+    const agent = findAgent(name);
+
+    if (!agent) {
+        console.log(`\n${pad}${c.red}${sym.cross}${c.reset} Agent not found: ${name}`);
+        console.log(`${pad}${c.dim}Run 'wtv agents' to see available agents.${c.reset}\n`);
+        return;
+    }
+
+    const config = loadConfig();
+    const editor = config.editor || process.env.EDITOR || 'vim';
+
+    console.log(`\n${pad}Opening ${c.cyan}${agent.name}${c.reset} in ${editor}...`);
+
+    const { execSync } = await import('child_process');
+    try {
+        execSync(`${editor} "${agent.path}"`, { stdio: 'inherit' });
+        console.log(`${pad}${c.green}${sym.check}${c.reset} Done.\n`);
+    } catch (err) {
+        console.log(`${pad}${c.red}${sym.cross}${c.reset} Failed to open editor: ${err.message}\n`);
+    }
+}
+
+async function agentsRemove(name) {
+    const pad = centerPad();
+    const agent = findAgent(name);
+
+    if (!agent) {
+        console.log(`\n${pad}${c.red}${sym.cross}${c.reset} Agent not found: ${name}`);
+        console.log(`${pad}${c.dim}Run 'wtv agents' to see available agents.${c.reset}\n`);
+        return;
+    }
+
+    console.log(`\n${pad}${c.yellow}${sym.warn}${c.reset} About to remove: ${c.bold}${agent.name}${c.reset}`);
+    console.log(`${pad}  ${c.dim}${agent.path}${c.reset}\n`);
+
+    const confirmed = await confirm(`${pad}Are you sure?`, false);
+
+    if (!confirmed) {
+        console.log(`\n${pad}${c.dim}Cancelled.${c.reset}\n`);
+        return;
+    }
+
+    rmSync(agent.path);
+    console.log(`\n${pad}${c.green}${sym.check}${c.reset} Removed: ${agent.name}\n`);
+}
+
 function showVisionStatus(scope) {
     const visionPath = getVisionPath(scope);
 
-    console.log(`\n  ${c.bold}codehogg${c.reset} v${getVersion()}`);
+    console.log(`\n  ${c.bold}wtv${c.reset} v${getVersion()}`);
     console.log(`  ${c.bold}Vision Status${c.reset}\n`);
 
     if (!visionPath || !existsSync(visionPath)) {
         console.log(`  ${c.yellow}${sym.warn}${c.reset} No VISION.md found.`);
-        console.log(`  ${c.dim}Run 'codehogg init' to create one.${c.reset}\n`);
+        console.log(`  ${c.dim}Run 'wtv init' to create one.${c.reset}\n`);
         return;
     }
 
@@ -1343,22 +2780,34 @@ function showVisionStatus(scope) {
 // ============================================================================
 
 function getLogsDir(scope) {
-    if (scope === 'global') {
-        const home = getHomedir();
-        return home ? join(home, CODEHOGG_LOGS_DIR) : null;
-    }
-    return join(process.cwd(), CODEHOGG_LOGS_DIR);
+    const base = scope === 'global'
+        ? (() => {
+            const home = getHomedir();
+            return home || null;
+        })()
+        : process.cwd();
+
+    if (!base) return null;
+
+    const wtv = join(base, WTV_LOGS_DIR);
+    if (existsSync(wtv)) return wtv;
+
+    const legacy = join(base, LEGACY_LOGS_DIR);
+    if (existsSync(legacy)) return legacy;
+
+    // Default to new location (created on first write)
+    return wtv;
 }
 
 function showLogs(scope, opts = {}) {
     const logsDir = getLogsDir(scope);
 
-    console.log(`\n  ${c.bold}codehogg${c.reset} v${getVersion()}`);
+    console.log(`\n  ${c.bold}wtv${c.reset} v${getVersion()}`);
     console.log(`  ${c.bold}Task Logs${c.reset}\n`);
 
     if (!logsDir || !existsSync(logsDir)) {
         console.log(`  ${c.dim}No logs found.${c.reset}`);
-        console.log(`  ${c.dim}Logs are created when you run /codehogg commands.${c.reset}\n`);
+        console.log(`  ${c.dim}Logs are created when you run /wtv commands.${c.reset}\n`);
         return;
     }
 
@@ -1437,56 +2886,64 @@ function showLogs(scope, opts = {}) {
         console.log('');
     }
 
-    console.log(`  ${c.dim}Use 'codehogg log --task <id>' to view a specific task.${c.reset}\n`);
+    console.log(`  ${c.dim}Use 'wtv log --task <id>' to view a specific task.${c.reset}\n`);
 }
 
 function showHelp() {
-    console.log(`
-  ${c.bold}codehogg${c.reset} v${getVersion()}
+    printBanner();
 
-  ${c.dim}9 agents + 21 skills for Claude Code, Codex CLI, and OpenCode.${c.reset}
+    const pad = centerPad();
+    console.log(`${pad}${c.bold}Usage${c.reset}`);
+    console.log(`${pad}  wtv [command] [options]\n`);
 
-  ${c.bold}Usage:${c.reset}
-    codehogg [command] [options]
+    console.log(`${pad}${c.bold}Commands${c.reset}`);
+    console.log(`${pad}  ${c.cyan}(no command)${c.reset}  Dashboard - show agents and vision`);
+    console.log(`${pad}  ${c.cyan}agents${c.reset}        List and manage agents`);
+    console.log(`${pad}  ${c.cyan}init${c.reset}          Install agents and create VISION.md`);
+    console.log(`${pad}  ${c.cyan}meet${c.reset}          Meet Paul and the Artisans`);
+    console.log(`${pad}  ${c.cyan}vision${c.reset}        Show VISION.md status`);
+    console.log(`${pad}  ${c.cyan}status${c.reset}        Show installation status`);
+    console.log(`${pad}  ${c.cyan}update${c.reset}        Update installed tools`);
+    console.log(`${pad}  ${c.cyan}help${c.reset}          Show this help\n`);
 
-  ${c.bold}Commands:${c.reset}
-    ${c.cyan}init${c.reset}              Interactive installation wizard + VISION.md setup
-    ${c.cyan}meet${c.reset}              Meet the Masterbuilder and Artisans
-    ${c.cyan}update${c.reset}            Update installations (defaults to what's installed)
-    ${c.cyan}uninstall${c.reset}         Remove installations (interactive by default)
-    ${c.cyan}status${c.reset}            Show installation status
-    ${c.cyan}vision${c.reset}            Show VISION.md status (populated vs blank sections)
-    ${c.cyan}log${c.reset}               Show task logs from /codehogg commands
-    ${c.cyan}help${c.reset}              Show this help
+    console.log(`${pad}${c.bold}Agent Commands${c.reset}`);
+    console.log(`${pad}  ${c.cyan}agents${c.reset}              List all agents`);
+    console.log(`${pad}  ${c.cyan}agents info${c.reset} <name>  Show agent details`);
+    console.log(`${pad}  ${c.cyan}agents add${c.reset} <name>   Create new agent`);
+    console.log(`${pad}  ${c.cyan}agents edit${c.reset} <name>  Open in $EDITOR`);
+    console.log(`${pad}  ${c.cyan}agents fav${c.reset} <name>   Toggle favorite`);
+    console.log(`${pad}  ${c.cyan}agents rm${c.reset} <name>    Remove agent\n`);
 
-  ${c.bold}Options:${c.reset}
-    --global, -g      Target global install locations
-    --local, -l       Target current project install locations
-    --force, -f       Overwrite existing installation
-    --tool <name>     Install/update/uninstall for a tool (repeatable)
-    --claude          Alias for --tool claude
-    --codex           Alias for --tool codex
-    --opencode        Alias for --tool opencode
-    --path <dir>      Custom directory (single-tool installs only)
-    --task <id>       (log) View a specific task log by ID
-    --date <YYYY-MM-DD> (log) Filter logs by date
-    --version, -v     Show version
-    --help, -h        Show this help
+    console.log(`${pad}${c.bold}Habakkuk Workflow${c.reset}  ${c.dim}"Write the vision, make it plain"${c.reset}`);
+    console.log(`${pad}  ${c.cyan}board${c.reset}               Show kanban board`);
+    console.log(`${pad}  ${c.cyan}cry${c.reset} "desc"          Enter a problem or need`);
+    console.log(`${pad}  ${c.cyan}wait${c.reset} <id>           Move to waiting (seeking)`);
+    console.log(`${pad}  ${c.cyan}vision${c.reset} <id>         Move to vision (answer received)`);
+    console.log(`${pad}  ${c.cyan}run${c.reset} <id>            Move to run (execute)`);
+    console.log(`${pad}  ${c.cyan}worship${c.reset} <id>        Move to worship (retrospective)`);
+    console.log(`${pad}  ${c.cyan}note${c.reset} <id> "text"    Add note to item`);
+    console.log(`${pad}  ${c.cyan}item${c.reset} <id>           Show item details`);
+    console.log(`${pad}  ${c.cyan}stones${c.reset}              View completed works\n`);
 
-  ${c.bold}Examples:${c.reset}
-    npx codehogg init                    # Interactive install + VISION.md setup
-    npx codehogg init --claude --codex   # Non-interactive install
-    npx codehogg update --global         # Update global installations
-    npx codehogg vision                  # Show VISION.md status
-    npx codehogg log                     # Show recent task logs
-    npx codehogg log --date 2026-01-15   # Show logs from specific date
-    npx codehogg log --task implement-oauth # View specific task log
-`);
+    console.log(`${pad}${c.bold}Options${c.reset}`);
+    console.log(`${pad}  ${c.dim}--global, -g${c.reset}     Global scope`);
+    console.log(`${pad}  ${c.dim}--force, -f${c.reset}      Overwrite existing`);
+    console.log(`${pad}  ${c.dim}--claude${c.reset}         Target Claude Code`);
+    console.log(`${pad}  ${c.dim}--opencode${c.reset}       Target OpenCode\n`);
+
+    console.log(`${pad}${c.bold}Examples${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv${c.reset}                       ${c.dim}# Dashboard${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv agents${c.reset}                ${c.dim}# List agents${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv agents add my-artisan${c.reset} ${c.dim}# Create agent${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv init --opencode${c.reset}       ${c.dim}# Install for OpenCode${c.reset}`);
+    console.log('');
 }
 
 function parseArgs(args) {
     const opts = {
         command: null,
+        subcommand: null,
+        agentName: null,
         global: false,
         local: false,
         force: false,
@@ -1495,6 +2952,8 @@ function parseArgs(args) {
         task: null,
         date: null,
     };
+
+    let positionalCount = 0;
 
     for (let i = 0; i < args.length; i++) {
         const a = args[i];
@@ -1567,8 +3026,14 @@ function parseArgs(args) {
             continue;
         }
 
-        if (!opts.command) {
+        // Positional arguments
+        positionalCount++;
+        if (positionalCount === 1) {
             opts.command = a;
+        } else if (positionalCount === 2) {
+            opts.subcommand = a;
+        } else if (positionalCount === 3) {
+            opts.agentName = a;
         }
     }
 
@@ -1618,7 +3083,13 @@ export async function run(args) {
         }
 
         case 'vision': {
-            showVisionStatus(scope);
+            // If subcommand is provided, it's a Habakkuk stage transition
+            // Otherwise, show VISION.md status
+            if (opts.subcommand) {
+                habakkukVision(opts.subcommand);
+            } else {
+                showVisionStatus(scope);
+            }
             break;
         }
 
@@ -1633,6 +3104,146 @@ export async function run(args) {
             showLogs(scope, { task: opts.task, date: opts.date });
             break;
         }
+
+        case 'agents':
+        case 'agent': {
+            // Handle subcommands: list, info, add, edit, fav, remove
+            const subcommand = opts.subcommand;
+            const agentName = opts.agentName;
+
+            switch (subcommand) {
+                case 'list':
+                case null:
+                case undefined:
+                    agentsList();
+                    break;
+                case 'info':
+                    if (!agentName) {
+                        console.log(`\n  ${c.red}Error:${c.reset} Agent name required.`);
+                        console.log(`  Usage: wtv agents info <name>\n`);
+                    } else {
+                        agentsInfo(agentName);
+                    }
+                    break;
+                case 'add':
+                case 'new':
+                case 'create':
+                    await agentsAdd(agentName, scope);
+                    break;
+                case 'edit':
+                    if (!agentName) {
+                        console.log(`\n  ${c.red}Error:${c.reset} Agent name required.`);
+                        console.log(`  Usage: wtv agents edit <name>\n`);
+                    } else {
+                        await agentsEdit(agentName);
+                    }
+                    break;
+                case 'fav':
+                case 'favorite':
+                case 'star':
+                    if (!agentName) {
+                        console.log(`\n  ${c.red}Error:${c.reset} Agent name required.`);
+                        console.log(`  Usage: wtv agents fav <name>\n`);
+                    } else {
+                        agentsFav(agentName, scope);
+                    }
+                    break;
+                case 'remove':
+                case 'rm':
+                case 'delete':
+                    if (!agentName) {
+                        console.log(`\n  ${c.red}Error:${c.reset} Agent name required.`);
+                        console.log(`  Usage: wtv agents remove <name>\n`);
+                    } else {
+                        await agentsRemove(agentName);
+                    }
+                    break;
+                default:
+                    // Assume subcommand is an agent name for quick info
+                    agentsInfo(subcommand);
+            }
+            break;
+        }
+
+        // ===== HABAKKUK WORKFLOW COMMANDS =====
+
+        case 'board': {
+            const showAll = opts.subcommand === '--all' || opts.subcommand === 'all';
+            habakkukBoard(showAll);
+            break;
+        }
+
+        case 'cry': {
+            if (!opts.subcommand) {
+                console.log(`\n  ${c.red}Error:${c.reset} Description required.`);
+                console.log(`  Usage: wtv cry "Description of the problem or need"\n`);
+                process.exit(1);
+            }
+            habakkukCry(opts.subcommand);
+            break;
+        }
+
+        case 'wait': {
+            if (!opts.subcommand) {
+                console.log(`\n  ${c.red}Error:${c.reset} Item ID or slug required.`);
+                console.log(`  Usage: wtv wait <id|slug> [note]\n`);
+                process.exit(1);
+            }
+            habakkukWait(opts.subcommand, opts.agentName);
+            break;
+        }
+
+        case 'run': {
+            if (!opts.subcommand) {
+                console.log(`\n  ${c.red}Error:${c.reset} Item ID or slug required.`);
+                console.log(`  Usage: wtv run <id|slug>\n`);
+                process.exit(1);
+            }
+            habakkukRun(opts.subcommand);
+            break;
+        }
+
+        case 'worship': {
+            if (!opts.subcommand) {
+                console.log(`\n  ${c.red}Error:${c.reset} Item ID or slug required.`);
+                console.log(`  Usage: wtv worship <id|slug>\n`);
+                process.exit(1);
+            }
+            await habakkukWorship(opts.subcommand);
+            break;
+        }
+
+        case 'note': {
+            if (!opts.subcommand) {
+                console.log(`\n  ${c.red}Error:${c.reset} Item ID or slug required.`);
+                console.log(`  Usage: wtv note <id|slug> "Your note text"\n`);
+                process.exit(1);
+            }
+            if (!opts.agentName) {
+                console.log(`\n  ${c.red}Error:${c.reset} Note text required.`);
+                console.log(`  Usage: wtv note <id|slug> "Your note text"\n`);
+                process.exit(1);
+            }
+            habakkukNote(opts.subcommand, opts.agentName);
+            break;
+        }
+
+        case 'item': {
+            if (!opts.subcommand) {
+                console.log(`\n  ${c.red}Error:${c.reset} Item ID or slug required.`);
+                console.log(`  Usage: wtv item <id|slug>\n`);
+                process.exit(1);
+            }
+            habakkukItem(opts.subcommand);
+            break;
+        }
+
+        case 'stones': {
+            habakkukStones();
+            break;
+        }
+
+        // ===== END HABAKKUK WORKFLOW COMMANDS =====
 
         case 'version':
         case '-v':
@@ -1653,10 +3264,9 @@ export async function run(args) {
 
             if (wantsInit) {
                 initNonInteractive(scope, opts.force, opts.tools, opts.path);
-            } else if (process.stdout.isTTY) {
-                await interactiveInit();
             } else {
-                showHelp();
+                // NEW: Show dashboard by default
+                dashboard();
             }
 
             break;
@@ -1664,7 +3274,7 @@ export async function run(args) {
 
         default: {
             console.log(`\n  ${c.red}Unknown command:${c.reset} ${opts.command}`);
-            console.log(`  Run 'codehogg help' for usage.\n`);
+            console.log(`  Run 'wtv help' for usage.\n`);
             process.exit(1);
         }
     }

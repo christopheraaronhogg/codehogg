@@ -1,76 +1,157 @@
-# codehogg
+# wtv
 
-**9 agents + 21 skills for Claude Code, Codex CLI, and OpenCode.**
+**Write The Vision (WTV) — a CLI for vision-driven development.**
 
-Vision-driven development with Masterbuilder + Artisans coordination. The Masterbuilder reads your VISION.md, consults domain artisans for counsel, creates plans for your approval, delegates execution, and verifies results.
+WTV installs a Biblical “team” (Paul + artisans) into your AI coding tools (Claude Code, Codex CLI, OpenCode) so they can help you build **any** software: apps, APIs, infrastructure, data, UI, security, docs.
 
-> "And the LORD answered me, and said, Write the vision, and make it plain upon tables, that he may run that readeth it."
-> — Habakkuk 2:2 (KJV)
+> "And the LORD answered me, and said, Write the vision, and make [it] plain upon tables, that he may run that readeth it."
+> — Habakkuk 2:2 (KJV PCE)
 
-> "According to the grace of God which is given unto me, as a wise masterbuilder, I have laid the foundation, and another buildeth thereon."
-> — 1 Corinthians 3:10 (KJV)
+> "According to the grace of God which is given unto me, as a wise masterbuilder, I have laid the foundation, and another buildeth thereon. But let every man take heed how he buildeth thereupon."
+> — 1 Corinthians 3:10 (KJV PCE)
 
-> "Where no counsel is, the people fall: but in the multitude of counsellors there is safety."
-> — Proverbs 11:14 (KJV)
+> "Where no counsel [is], the people fall: but in the multitude of counsellers [there is] safety."
+> — Proverbs 11:14 (KJV PCE)
+
+## How It Works
+
+**wtv is a management tool, not an AI runtime.** It installs agent and skill definitions that the native AI CLIs execute so you can apply them to real development work.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         wtv CLI                                │
+│            (Management Layer - install, list, edit)             │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                    installs into
+                              │
+     ┌────────────┬───────────┼───────────┬────────────┐
+     ▼            ▼           ▼           ▼            ▼
+┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+│ Claude  │ │ OpenCode│ │  Codex  │ │ Gemini  │ │  Future │
+│  Code   │ │         │ │   CLI   │ │   CLI   │ │  Tools  │
+└─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘
+     │            │           │           │            │
+     └────────────┴───────────┴───────────┴────────────┘
+                              │
+                     AI executes here
+              (Native Task tool spawns agents,
+               skills load as context)
+```
+
+**The flow:**
+1. `wtv init` installs agents/skills into tool-specific folders
+2. You work in Claude Code, OpenCode, Codex, or Gemini CLI
+3. The AI loads skills as context and spawns agents via native Task tools
+4. wtv CLI helps you see and manage what's installed
+
+## Agent Command Center
+
+Run `wtv` anywhere to see your agent landscape:
+
+```bash
+wtv                      # Dashboard - agents, vision, quick actions
+wtv agents               # List all agents (local + global)
+wtv agents info <name>   # Show agent details
+wtv agents add <name>    # Create new agent
+wtv agents edit <name>   # Open in $EDITOR
+wtv agents fav <name>    # Toggle favorite (★)
+wtv agents rm <name>     # Remove agent
+```
+
+The AI inside these tools can also run `npx wtv agents` to discover what's available before spawning agents.
 
 ## Installation
 
-### Quick Start (Interactive)
+### Quick Start
 
 ```bash
-npx codehogg init
+npx wtv init
 ```
 
-This runs an interactive wizard to install codehogg for one or more tools.
+Interactive wizard to install for one or more tools.
 
-### Non-Interactive Installs
+### Non-Interactive
 
 ```bash
 # Claude Code (agents + skills)
-npx codehogg init --claude
-npx codehogg init --claude --global
+npx wtv init --claude
+npx wtv init --claude --global
 
-# Codex CLI (skills)
-npx codehogg init --codex
-npx codehogg init --codex --global
+# OpenCode (agents + skills)
+npx wtv init --opencode
+npx wtv init --opencode --global
 
-# OpenCode (skills + agents)
-npx codehogg init --opencode
-npx codehogg init --opencode --global
+# Codex CLI (skills only)
+npx wtv init --codex
+npx wtv init --codex --global
 ```
 
-**OpenCode note:** skills install to `.claude/skills` (Claude-compatible path); agents install to `.opencode/agent` (global: `~/.config/opencode/agent`).
-
-### Keep Up to Date
-
-codehogg automatically checks for updates weekly and notifies you when a new version is available. You can also manually update:
+### Updates
 
 ```bash
-# Update installed tools in this project
-npx codehogg update
-
-# Update installed tools globally
-npx codehogg update --global
-
-# Or target a specific tool
-npx codehogg update --tool codex
+npx wtv update           # Update project installations
+npx wtv update --global  # Update global installations
 ```
 
-**Disable update checks:** Set `CODEHOGG_NO_UPDATE_CHECK=1` environment variable.
+## What Gets Installed
+
+### Agents (10)
+
+Paul (the Masterbuilder) + 9 artisans:
+
+| Agent | Domain |
+|-------|--------|
+| **paul** | Orchestrates /wtv - reads vision, consults artisans, creates plans |
+| **nehemiah** | Security - auth, secrets, compliance |
+| **bezaleel** | Architecture - structure, patterns, refactors |
+| **hiram** | Backend - services, APIs, workflows |
+| **aholiab** | Frontend - UI/UX, accessibility, clarity |
+| **solomon** | Data - schema, integrity, migrations |
+| **zerubbabel** | DevOps - CI/CD, release, deployment |
+| **ezra** | QA - tests, verification, regression prevention |
+| **moses** | Product - requirements, scope, acceptance |
+| **david** | Voice - copy, tone, worship/remembrance |
+
+Agents run in isolated context windows via the native Task tool. Each consults domain-specific skills for methodology.
+
+### Skills (21)
+
+Domain knowledge that loads as context when relevant:
+
+- **Core:** wtv, artisan-contract, user-testing
+- **Domain Consultants:** 18 specialized methodologies (security, architecture, backend, frontend, database, devops, qa, product, ux, ui-design, copy, seo, performance, cost, observability, compliance, docs, stack, code-quality)
+
+Skills contain evaluation frameworks, checklists, and report templates.
+
+### Installation Paths
+
+```
+# Claude Code
+.claude/
+├── agents/      # Agent definitions
+└── skills/      # Skill definitions
+
+# OpenCode
+.opencode/
+└── agent/       # Agent definitions (skills from .claude/skills/)
+
+# Codex CLI
+.codex/
+└── skills/      # Skill definitions (no agents)
+```
 
 ## Vision-Driven Development
 
-The core of codehogg v5.0 is **vision-driven development**. Instead of measuring code against universal standards, codehogg measures against *your declared intent*.
-
 ### VISION.md
 
-Create a `VISION.md` in your project root:
+Create a vision file that agents align to:
 
 ```bash
-npx codehogg init
+npx wtv init   # Wizard helps you define it
 ```
 
-The wizard guides you through defining:
+Sections:
 - **Purpose** — Who is this for and what does it do?
 - **Outcomes** — What does success look like?
 - **Values** — What matters most? What tradeoffs are acceptable?
@@ -78,18 +159,26 @@ The wizard guides you through defining:
 - **Stage** — Prototype / MVP / Production / Maintenance
 - **Current Focus** — What's the one thing right now?
 
-### The /codehogg Command
+### The /wtv Command
 
-```bash
-/codehogg                           # Strategic review: distance-to-vision
-/codehogg "implement OAuth login"   # Tactical mission with counsel
+Inside Claude Code, OpenCode, or Codex:
+
+```
+/wtv                           # Strategic review: distance-to-vision
+/wtv "implement OAuth login"   # Tactical mission with counsel
 ```
 
-The **Masterbuilder** agent reads your vision, consults domain artisans for counsel, creates a plan with complete task list for your approval, then delegates execution to artisans. Every recommendation traces back to your VISION.md.
+The Masterbuilder:
+1. Reads VISION.md
+2. Consults relevant artisans for counsel
+3. Creates a plan with complete task list
+4. Awaits your approval
+5. Delegates execution to artisans
+6. Verifies and integrates results
 
 ### Distance Bands
 
-Progress is measured in honest bands, not false-precision percentages:
+Progress measured in honest bands, not percentages:
 
 | Band | Meaning |
 |------|---------|
@@ -97,331 +186,153 @@ Progress is measured in honest bands, not false-precision percentages:
 | **Medium** | Core approach exists but gaps block outcomes |
 | **Far** | Missing fundamentals or contradicts vision |
 
-## Architecture
+## The Habakkuk Workflow
 
-codehogg ships **agents + skills**, installed into tool-specific folders:
+A spiritual framework for product development based on Habakkuk 2:1-3.
 
-```text
-# Claude Code
-.claude/
-├── agents/   # Claude Code agents
-└── skills/   # Skills + slash command aliases
+> "I will stand upon my watch, and set me upon the tower, and will watch to see what he will say unto me... Write the vision, and make it plain upon tables, that he may run that readeth it."
+> — Habakkuk 2:1-2 (KJV)
 
-# Codex CLI
-.codex/
-└── skills/   # Skills (invoke as $skill-name)
-
-# OpenCode
-.opencode/
-└── agent/    # OpenCode subagents
-# (OpenCode skills are loaded from .claude/skills)
-```
-
-### Agents (9)
-
-The Masterbuilder + 8 domain Artisans. Each agent:
-- Runs in its own context window (isolated from main conversation)
-- Uses Opus model for deep analysis
-- Has restricted tool access appropriate to their role
-- References skills for domain knowledge
-
-### Skills (21)
-
-Domain knowledge that Claude loads automatically when your request matches the skill's description. Skills contain:
-- Evaluation frameworks and methodologies
-- Checklists and assessment criteria
-- Report templates and output formats
-- Best practices and red flags
-
-### Commands (57)
-
-Slash commands you invoke explicitly. Commands:
-- Orchestrate which agents to run
-- Define wave-based execution for parallel work
-- Handle output file management
-- Compile summaries from multiple agents
-
-## The Agents
-
-### Masterbuilder + Artisans (9)
-
-The core 2-tier architecture for vision-driven development:
-
-| Agent | Role | Model |
-|-------|------|-------|
-| **masterbuilder** | The wise Masterbuilder. Orchestrates all /codehogg operations. | Opus |
-
-**Artisans** — Domain experts that provide counsel AND execute tasks:
-
-| Artisan | Domain |
-|---------|--------|
-| security-artisan | Auth, vulnerabilities, secrets, compliance |
-| architecture-artisan | System design, patterns, structure, code quality |
-| backend-artisan | API, services, data access, business logic |
-| frontend-artisan | UI, UX, components, accessibility |
-| database-artisan | Schema, queries, migrations, optimization |
-| devops-artisan | CI/CD, infrastructure, deployment, observability |
-| qa-artisan | Testing, quality, reliability |
-| product-artisan | Requirements, scope, documentation |
-
-## Commands
-
-### Audit Commands
-
-Run expert analysis on existing code:
-
-| Command | Description |
-|---------|-------------|
-| `/audit-full` | Comprehensive multi-domain audit with remediation roadmap |
-| `/audit-quick` | 7 key agents in 2 waves |
-| `/audit-architecture` | System structure evaluation |
-| `/audit-security` | OWASP vulnerabilities, auth |
-| `/audit-performance` | Bottlenecks, Core Web Vitals |
-| `/audit-database` | Schema, queries, indexes |
-| `/audit-ui` | Visual design, AI slop detection |
-| `/audit-ux` | Usability, accessibility |
-| ... | (domain-specific + bundles) |
-
-### Plan Commands
-
-Plan new features with interview → PRD → roundtable → detailed plans:
-
-| Command | Description |
-|---------|-------------|
-| `/plan-full` | Full planning workflow with discovery and expert input |
-| `/plan-full "feature"` | Skip interview, proceed with provided details |
-| `/plan-quick` | Streamlined planning with key domains |
-| `/plan-architecture` | Architecture-focused planning |
-| `/plan-security` | Security-focused planning |
-| ... | (domain-specific planning commands) |
-
-### Implementation Commands
-
-| Command | Description |
-|---------|-------------|
-| `/implement-solo` | Main agent implements from plan |
-| `/implement-team` | Parallel delegation for independent tasks |
-
-## User Testing
-
-After implementation, the Masterbuilder can conduct user testing using the `user-testing` skill. Artisans embody user personas to verify the work from real-world perspectives.
-
-### The Personas
-
-| Persona | Archetype | Device | Patience | Focus |
-|---------|-----------|--------|----------|-------|
-| Sarah | Small business owner | Mobile | Medium | "Is this for me?" |
-| Mike | Experienced professional | Desktop | Low | "Worth switching?" |
-| Jenny | Rush order handler | Desktop | Very Low | "Need this NOW" |
-| Carlos | Mobile-first user | Mobile | Low | "Quick status check" |
-| David | Accessibility user | Keyboard | High | "Can I use this?" |
-| Patricia | Skeptical shopper | Desktop | High | "Is this legit?" |
-
-### How It Works
-
-1. Masterbuilder identifies what needs testing
-2. Assigns personas to artisans (e.g., frontend-artisan → Sarah)
-3. Each artisan tests from their domain expertise + persona perspective
-4. Masterbuilder synthesizes findings and recommends ship/fix
-
-This combines domain expertise with user empathy — no separate agents needed.
-
-## Feature Planning
-
-A professional-grade planning workflow modeled after real software development firms.
-
-### The 5-Phase Workflow
+### The Five Stages
 
 ```
-INTERVIEW → PRD DRAFT → ROUNDTABLE → DETAIL → INTEGRATE
+┌───────────┐   ┌───────────┐   ┌───────────┐   ┌───────────┐   ┌───────────┐
+│  CRY OUT  │──▶│   WAIT    │──▶│  VISION   │──▶│    RUN    │──▶│  WORSHIP  │
+│  Problem  │   │  Seeking  │   │  Answer   │   │  Execute  │   │  Gratitude│
+└───────────┘   └───────────┘   └───────────┘   └───────────┘   └───────────┘
 ```
 
-1. **Interview** — Discover what you want to build (optional if you provide details)
-2. **PRD Draft** — Product artisan creates initial requirements
-3. **Roundtable** — 9 experts sequentially enrich the PRD
-4. **Detail** — Parallel deep planning for each domain
-5. **Integrate** — Combine into sequenced implementation plan
+1. **CRY OUT** — Enter a problem or need ("I will stand upon my watch")
+2. **WAIT** — Position to receive, gather context, pray ("watch to see what he will say")
+3. **VISION** — The answer comes, write it plainly ("Write the vision, make it plain")
+4. **RUN** — Execute with clarity ("that he may run that readeth it")
+5. **WORSHIP** — Retrospective, gratitude, stones of remembrance (Habakkuk 3)
 
-### Running a Full Plan
+### Workflow Commands
 
 ```bash
-# Interview mode - asks what you want to build
-/plan-full
+# View your board
+wtv board               # Show kanban board
 
-# Skip interview - proceed with details
-/plan-full "OAuth login with Google and GitHub for our Laravel app"
+# Create and move items
+wtv cry "description"   # Enter a problem or need
+wtv wait <id>           # Move to waiting (seeking)
+wtv vision <id>         # Move to vision (answer received)
+wtv run <id>            # Move to execution
+wtv worship <id>        # Complete with retrospective
+
+# Manage items
+wtv note <id> "text"    # Add note while waiting
+wtv item <id>           # View item details
+wtv stones              # View completed works
 ```
 
-### The Expert Roundtable
+### Vision and Worship Documents
 
-Each expert reviews the PRD and adds their considerations:
-
-| Expert | Adds |
-|--------|------|
-| Architect | System structure, patterns |
-| Security | Threat model, auth requirements |
-| Database | Data model, schema design |
-| Backend | API design, services |
-| UX | User flows, states, accessibility |
-| DevOps | Infrastructure, deployment |
-| Performance | Load targets, optimization |
-| QA | Test strategy, acceptance criteria |
-
-### Flexible Interview
-
-All questions are **optional**. Say "skip" or "idk" and the orchestrator:
-- Makes reasonable assumptions
-- Uses context from CLAUDE.md and codebase
-- Notes assumptions for your confirmation
-- Keeps moving forward
-
-## How It Works
-
-### Proactive Agent Use
-
-With agents defined, Claude can proactively use them:
-
-> **You:** "I just added OAuth login"
-> **Claude:** "I notice you added authentication code. Let me have the security-artisan review it in a separate context."
-
-### Wave-Based Execution
-
-For full audits, agents run in waves to prevent context overflow:
-
-1. **Wave 1: Quality** (3 agents) - Architecture, Code Quality, Requirements
-2. **Wave 2: Backend** (5 agents) - API, Database, Stack, Security, Compliance
-3. **Wave 3: Ops** (5 agents) - DevOps, Cost, Docs, QA, Observability
-4. **Wave 4: Frontend** (5 agents) - UI, UX, Copy, Performance, SEO
-
-Each agent writes their full report to a file and returns only a brief status.
-
-### Integration Phase
-
-After domain audits complete, findings are synthesized:
-
-1. **Cross-references findings** - Issues flagged by multiple domains get priority boost
-2. **Identifies systemic patterns** - "Technical debt concentrated in OrderService"
-3. **Maps dependencies** - "Fix input validation BEFORE addressing SQL injection"
-4. **Creates remediation roadmap** - Phased plan respecting dependencies
-
-This transforms isolated reports into ONE coherent action plan.
-
-### Context Isolation
-
-Each agent runs in its own context window, which means:
-- Main conversation stays focused on high-level objectives
-- Agents can do deep analysis without polluting your context
-- Failed agents don't affect others in the wave
-
-## Output Structure
-
-### Audit Reports
+When an item moves to **VISION**, a template is created:
 
 ```
-audit-reports/{timestamp}/
-├── 00-executive-summary.md      # Combined findings + cross-domain insights
-├── 00-priority-matrix.md        # All findings ranked with corroboration
-├── 00-remediation-roadmap.md    # Phased action plan with dependencies
-├── 01-architecture-assessment.md
-├── 02-security-assessment.md
-├── ...
-└── [domain]-assessment.md
+.wtv/habakkuk/items/001-password-reset/VISION.md
 ```
 
-### Planning Documents
+When completing **WORSHIP**, a retrospective template is created:
 
 ```
-planning-docs/{feature-slug}/
-├── 00-interview-notes.md       # Discovery conversation (if happened)
-├── 01-prd-draft.md             # Initial PRD
-├── 02-prd-enriched.md          # PRD after expert roundtable
-├── plans/
-│   ├── architecture.md
-│   ├── security.md
-│   ├── database.md
-│   ├── backend.md
-│   ├── frontend.md
-│   └── ...
-└── 99-implementation-plan.md   # Final sequenced plan
+.wtv/habakkuk/items/001-password-reset/WORSHIP.md
 ```
 
-## Project Integration
+These documents capture:
+- What was accomplished
+- What was learned
+- Evidence of God's faithfulness
+- Gratitude notes
+- Stones of remembrance
 
-For best results, your project should include:
+### Integration with Masterbuilder
 
-### CLAUDE.md (recommended)
+When you move an item to RUN, invoke the Masterbuilder inside your AI CLI:
 
-Project-specific guidelines, voice/tone, conventions.
+```
+/wtv "password-reset"
+```
 
-### DESIGN_SYSTEM.md (recommended)
+The Masterbuilder reads your vision document and coordinates the artisans.
 
-Design tokens, colors, typography, component patterns.
+## Creating Custom Agents
 
-Agents read these automatically when gathering context.
+```bash
+wtv agents add my-artisan
+```
+
+This creates a new agent from template. Edit it:
+
+```bash
+wtv agents edit my-artisan
+```
+
+The template follows the artisan-contract pattern:
+- Counsel mode (provide advice)
+- Execution mode (implement tasks)
+- Vision alignment
+- Evidence citations
 
 ## CLI Reference
 
 ```bash
-# Interactive wizard (choose tool(s) + scope)
-npx codehogg init
+# Dashboard & Agents
+wtv                      # Dashboard
+wtv agents               # List agents
+wtv agents add <name>    # Create agent
+wtv agents edit <name>   # Edit agent
+wtv agents fav <name>    # Toggle favorite
+wtv agents rm <name>     # Remove agent
 
-# Non-interactive installs
-npx codehogg init --claude
-npx codehogg init --codex
-npx codehogg init --opencode
+# Habakkuk Workflow
+wtv board                # Show kanban board
+wtv cry "description"    # Enter a problem
+wtv wait <id>            # Move to waiting
+wtv vision <id>          # Move to vision
+wtv run <id>             # Move to execution
+wtv worship <id>         # Complete with retrospective
+wtv note <id> "text"     # Add note to item
+wtv item <id>            # Show item details
+wtv stones               # View completed works
 
-# Global installs
-npx codehogg init --claude --global
-npx codehogg init --codex --global
-npx codehogg init --opencode --global
+# Installation
+wtv init                 # Interactive install
+wtv init --claude        # Claude Code
+wtv init --opencode      # OpenCode
+wtv init --codex         # Codex CLI
+wtv update               # Update installations
+wtv status               # Show what's installed
 
-# Update (defaults to what's installed)
-npx codehogg update
-npx codehogg update --global
-npx codehogg update --tool codex
+# Vision
+wtv vision               # Show VISION.md status
 
-# Check installation status
-npx codehogg status
-
-# Uninstall
-npx codehogg uninstall            # interactive
-npx codehogg uninstall --tool codex
-
-# Show version/help
-npx codehogg --version
-npx codehogg help
+# Help
+wtv help                 # Show help
+wtv --version            # Show version
 ```
 
-## Example Workflows
-
-### Quick Health Check
+## Example Workflow
 
 ```bash
-npx codehogg init
-```
-Then in Claude Code:
-```
-/audit-quick
-```
-Get analysis from 7 key agents in about 5 minutes.
+# 1. Install wtv for Claude Code
+npx wtv init --claude
 
-### Deep Security Review
+# 2. Create your vision
+# (wizard runs during init, or edit VISION.md directly)
 
-```
-/audit-security
-```
-The security-artisan runs in isolated context with OWASP methodology.
+# 3. Start Claude Code and use your agents
+claude
 
-### Plan a New Feature
-
-```
-/plan-full "user authentication with OAuth"
-```
-Full 5-phase planning: interview (skipped with input), PRD, expert roundtable, detailed plans, integrated implementation plan.
-
-Or for faster planning:
-```
-/plan-quick "user authentication with OAuth"
+# 4. Inside Claude Code:
+/wtv "implement user authentication"
+# → Masterbuilder consults security, backend, database artisans
+# → Creates plan with tasks
+# → You approve
+# → Artisans execute in parallel
+# → Masterbuilder integrates and reports
 ```
 
 ## License

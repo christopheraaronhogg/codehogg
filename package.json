@@ -1,7 +1,7 @@
 {
-  "name": "codehogg",
-  "version": "5.1.1",
-  "description": "9 agents + 21 skills for Claude Code, Codex CLI, and OpenCode. Vision-driven development with Masterbuilder + Artisans coordination.",
+  "name": "wtv",
+  "version": "7.0.1",
+  "description": "Write The Vision (WTV): vision-driven development with the Habakkuk workflow. 10 agents + 21 skills for Claude Code, Codex CLI, and OpenCode.",
   "author": "Christopher Hogg",
   "license": "MIT",
   "repository": {
@@ -20,6 +20,10 @@
     "opencode",
     "openai",
     "ai",
+    "habakkuk",
+    "kanban",
+    "vision",
+    "workflow",
     "audit",
     "architecture",
     "security",
@@ -29,7 +33,7 @@
     "planning"
   ],
   "bin": {
-    "codehogg": "./bin/codehogg.js"
+    "wtv": "./bin/wtv.js"
   },
   "files": [
     "bin",
