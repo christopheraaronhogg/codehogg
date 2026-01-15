@@ -334,7 +334,7 @@ function getAgentLocations() {
     // Templates (Available to be installed)
     locations.push({
         label: 'Available',
-        path: TEMPLATES_DIR,
+        path: join(TEMPLATES_DIR, 'agents'),
         tool: 'all',
         scope: 'available',
     });
@@ -1560,7 +1560,7 @@ async function meetTheTeam() {
     // The Masterbuilder
     console.log(`  ${c.bold}${c.yellow}PAUL — THE MASTERBUILDER${c.reset}`);
     console.log(`  ${c.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${c.reset}`);
-    const paulAgent = parseAgentFile(join(TEMPLATES_DIR, 'paul.md'));
+    const paulAgent = parseAgentFile(join(TEMPLATES_DIR, 'agents', 'paul.md'));
     if (paulAgent && paulAgent.asciiArt) {
         console.log(paulAgent.asciiArt);
     } else {
@@ -1593,7 +1593,7 @@ async function meetTheTeam() {
 
     for (const artisan of ARTISAN_DEFS) {
         console.log(`  ${artisan.color}${c.bold}${artisan.name}${c.reset}`);
-        const templatePath = join(TEMPLATES_DIR, artisan.file);
+        const templatePath = join(TEMPLATES_DIR, 'agents', artisan.file);
         const agent = parseAgentFile(templatePath);
         if (agent && agent.asciiArt) {
             console.log(agent.asciiArt);
