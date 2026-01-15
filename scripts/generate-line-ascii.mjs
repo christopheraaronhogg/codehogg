@@ -43,7 +43,7 @@ async function generateLineArtASCII(agentName, imageFile) {
             let row = '';
             let rowEmpty = true;
             for (let x = 0; x < image.bitmap.width; x++) {
-                const color = Jimp.intToRGBA(image.getPixelColor(x, y));
+                const color = intToRGBA(image.getPixelColor(x, y));
                 const brightness = (color.r + color.g + color.b) / 3;
 
                 // INVERTED Logic: Source is black on white. 
