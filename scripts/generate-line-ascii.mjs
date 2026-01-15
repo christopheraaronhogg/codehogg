@@ -19,6 +19,15 @@ const AGENTS = {
 const BRAIN_DIR = '/Users/chrishogg/.gemini/antigravity/brain/14635805-b6b5-4657-9057-5286ec00cf8b';
 const TEMPLATES_DIR = '/Users/chrishogg/Documents/GitHub/codehogg/templates/agents';
 
+function intToRGBA(i) {
+    return {
+        r: (i >>> 24) & 0xff,
+        g: (i >>> 16) & 0xff,
+        b: (i >>> 8) & 0xff,
+        a: i & 0xff,
+    };
+}
+
 async function generateLineArtASCII(agentName, imageFile) {
     const imagePath = path.join(BRAIN_DIR, imageFile);
     if (!fs.existsSync(imagePath)) return;
