@@ -1165,9 +1165,7 @@ function getHomedir() {
 function validatePath(dirPath) {
     try {
         const parentDir = dirname(dirPath);
-        if (!existsSync(parentDir)) {
-            return { valid: false, error: `Parent directory does not exist: ${parentDir}` };
-        }
+        ensureDir(parentDir);
         accessSync(parentDir, constants.W_OK);
         return { valid: true };
     } catch (err) {
@@ -1714,6 +1712,11 @@ function writeTimestamp(dir) {
     ensureDir(dir);
     const timestampFile = join(dir, '.wtv-updated');
     writeFileSync(timestampFile, new Date().toISOString().split('T')[0]);
+
+    const legacy = join(dir, '.codehogg-updated');
+    if (existsSync(legacy)) {
+        rmSync(legacy, { force: true });
+    }
 }
 
 function parseClaudeAgentTemplate(agentPath) {
@@ -1738,24 +1741,82 @@ function parseClaudeAgentTemplate(agentPath) {
     return { frontmatter: fm, body };
 }
 
+function getTemplateSkillDirs() {
+    const source = join(TEMPLATES_DIR, 'skills');
+    if (!existsSync(source)) return [];
+
+    return readdirSync(source).filter(name => {
+        try {
+            return statSync(join(source, name)).isDirectory();
+        } catch {
+            return false;
+        }
+    });
+}
+
+function getTemplateAgentFiles() {
+    const source = join(TEMPLATES_DIR, 'agents');
+    if (!existsSync(source)) return [];
+    return readdirSync(source).filter(f => f.endsWith('.md'));
+}
+
+function getLegacyAgentFiles() {
+    return Object.keys(LEGACY_AGENT_NAME_ALIASES).map(name => `${name}.md`);
+}
+
+function countInstalledDirs(dir, dirNames) {
+    if (!dir || !existsSync(dir)) return 0;
+    let count = 0;
+    for (const name of dirNames) {
+        if (existsSync(join(dir, name))) count++;
+    }
+    return count;
+}
+
+function countInstalledFiles(dir, fileNames) {
+    if (!dir || !existsSync(dir)) return 0;
+    let count = 0;
+    for (const name of fileNames) {
+        if (existsSync(join(dir, name))) count++;
+    }
+    return count;
+}
+
 function installSkills(destDir, { force, showProgress, label }) {
     const source = join(TEMPLATES_DIR, 'skills');
     if (!existsSync(source)) {
         throw new Error(`Templates missing: ${source}`);
     }
 
-    if (existsSync(destDir) && !force) {
-        throw new Error(`Existing installation found at ${destDir}. Use --force to overwrite.`);
+    const skillDirs = getTemplateSkillDirs();
+    ensureDir(destDir);
+
+    for (const name of skillDirs) {
+        const srcSkillDir = join(source, name);
+        const destSkillDir = join(destDir, name);
+
+        if (existsSync(destSkillDir)) {
+            if (!force) {
+                throw new Error(`Existing skill found at ${destSkillDir}. Use --force to overwrite.`);
+            }
+            rmSync(destSkillDir, { recursive: true, force: true });
+        }
+
+        copyDir(srcSkillDir, destSkillDir);
     }
 
-    resetDir(destDir);
-    const copied = copyDir(source, destDir);
+    if (force) {
+        const legacyCoreSkillDir = join(destDir, 'codehogg');
+        if (existsSync(legacyCoreSkillDir)) {
+            rmSync(legacyCoreSkillDir, { recursive: true, force: true });
+        }
+    }
 
     if (showProgress) {
-        console.log(`    ${c.green}${sym.check}${c.reset} ${label} (${countDirs(destDir)} skills)`);
+        console.log(`    ${c.green}${sym.check}${c.reset} ${label} (${skillDirs.length} skills)`);
     }
 
-    return copied;
+    return skillDirs.length;
 }
 
 function installClaude(targetDir, { force, showProgress, selectedArtisans = null }) {
@@ -1769,15 +1830,24 @@ function installClaude(targetDir, { force, showProgress, selectedArtisans = null
     const agentsSource = join(TEMPLATES_DIR, 'agents');
     const agentsDest = join(targetDir, 'agents');
 
-    if (existsSync(agentsDest) && !force) {
-        throw new Error(`Existing installation found at ${agentsDest}. Use --force to overwrite.`);
+    if (!existsSync(agentsSource)) {
+        throw new Error(`Templates missing: ${agentsSource}`);
     }
 
-    resetDir(agentsDest);
+    ensureDir(agentsDest);
+
+    if (force) {
+        for (const legacyFile of getLegacyAgentFiles()) {
+            const p = join(agentsDest, legacyFile);
+            if (existsSync(p)) {
+                rmSync(p, { force: true });
+            }
+        }
+    }
 
     // Copy agents - optionally filter by selected artisans
     let agentCount = 0;
-    const agentFiles = readdirSync(agentsSource).filter(f => f.endsWith('.md'));
+    const agentFiles = getTemplateAgentFiles();
     const artisanFiles = new Set(ARTISAN_DEFS.map(a => a.file));
     const artisanByFile = new Map(ARTISAN_DEFS.map(a => [a.file, a]));
 
@@ -1788,9 +1858,18 @@ function installClaude(targetDir, { force, showProgress, selectedArtisans = null
         const isArtisan = artisanFiles.has(file);
         if (isArtisan && selectedArtisans) {
             const artisan = artisanByFile.get(file);
-            if (!artisan || !selectedArtisans.includes(artisan.id)) {
+            const selected = artisan && selectedArtisans.includes(artisan.id);
+
+            if (!selected) {
+                if (force && existsSync(destPath)) {
+                    rmSync(destPath, { force: true });
+                }
                 continue;
             }
+        }
+
+        if (existsSync(destPath) && !force) {
+            throw new Error(`Existing agent found at ${destPath}. Use --force to overwrite.`);
         }
 
         copyFileSync(srcPath, destPath);
@@ -1804,6 +1883,13 @@ function installClaude(targetDir, { force, showProgress, selectedArtisans = null
     const wtvDest = join(targetDir, 'WTV.md');
     if (existsSync(wtvSrc)) {
         copyFileSync(wtvSrc, wtvDest);
+    }
+
+    if (force) {
+        const legacyPluginDoc = join(targetDir, 'CODEHOGG.md');
+        if (existsSync(legacyPluginDoc)) {
+            rmSync(legacyPluginDoc, { force: true });
+        }
     }
 
     writeTimestamp(targetDir);
@@ -1837,28 +1923,43 @@ function installOpenCodeAgents(agentDir, { force, showProgress, selectedArtisans
         throw new Error(`Templates missing: ${sourceDir}`);
     }
 
-    if (existsSync(agentDir) && !force) {
-        throw new Error(`Existing installation found at ${agentDir}. Use --force to overwrite.`);
-    }
+    ensureDir(agentDir);
 
-    resetDir(agentDir);
+    if (force) {
+        for (const legacyFile of getLegacyAgentFiles()) {
+            const p = join(agentDir, legacyFile);
+            if (existsSync(p)) {
+                rmSync(p, { force: true });
+            }
+        }
+    }
 
     const artisanFiles = new Set(ARTISAN_DEFS.map(a => a.file));
     const artisanByFile = new Map(ARTISAN_DEFS.map(a => [a.file, a]));
 
-    const agentFiles = readdirSync(sourceDir)
-        .filter(f => f.endsWith('.md'))
-        .filter(file => {
-            if (!selectedArtisans) return true;
-            if (!artisanFiles.has(file)) return true;
-
-            const artisan = artisanByFile.get(file);
-            return artisan && selectedArtisans.includes(artisan.id);
-        })
-        .sort();
+    const agentFiles = getTemplateAgentFiles().sort();
 
     let written = 0;
     for (const file of agentFiles) {
+        const destPath = join(agentDir, file);
+        const isArtisan = artisanFiles.has(file);
+
+        if (isArtisan && selectedArtisans) {
+            const artisan = artisanByFile.get(file);
+            const selected = artisan && selectedArtisans.includes(artisan.id);
+
+            if (!selected) {
+                if (force && existsSync(destPath)) {
+                    rmSync(destPath, { force: true });
+                }
+                continue;
+            }
+        }
+
+        if (existsSync(destPath) && !force) {
+            throw new Error(`Existing agent found at ${destPath}. Use --force to overwrite.`);
+        }
+
         const inputPath = join(sourceDir, file);
         const { frontmatter, body } = parseClaudeAgentTemplate(inputPath);
         const description = frontmatter.description || `WTV agent: ${file.replace(/\.md$/, '')}`;
@@ -1881,7 +1982,7 @@ function installOpenCodeAgents(agentDir, { force, showProgress, selectedArtisans
             body.trimStart(),
         ].join('\n');
 
-        writeFileSync(join(agentDir, file), out);
+        writeFileSync(destPath, out);
         written++;
     }
 
@@ -1935,10 +2036,34 @@ function detectInstalled(scope) {
 
     const opencodeAgentsDir = getOpenCodeAgentDir(scope);
 
+    const templateAgentFiles = getTemplateAgentFiles();
+    const legacyAgentFiles = getLegacyAgentFiles();
+
+    const claudeAgentsDir = claudeRoot ? join(claudeRoot, 'agents') : null;
+    const codexSkillsDir = codexRoot ? join(codexRoot, 'skills') : null;
+
+    const hasClaudeAgents =
+        countInstalledFiles(claudeAgentsDir, templateAgentFiles) > 0 ||
+        countInstalledFiles(claudeAgentsDir, legacyAgentFiles) > 0;
+
+    const hasClaudeMarker = !!claudeRoot && (
+        existsSync(join(claudeRoot, 'WTV.md')) ||
+        existsSync(join(claudeRoot, 'CODEHOGG.md'))
+    );
+
+    const hasCodexCoreSkill = !!codexSkillsDir && (
+        existsSync(join(codexSkillsDir, 'wtv')) ||
+        existsSync(join(codexSkillsDir, 'codehogg'))
+    );
+
+    const hasOpenCodeAgents =
+        countInstalledFiles(opencodeAgentsDir, templateAgentFiles) > 0 ||
+        countInstalledFiles(opencodeAgentsDir, legacyAgentFiles) > 0;
+
     return {
-        claude: !!claudeRoot && (existsSync(join(claudeRoot, 'agents')) || existsSync(join(claudeRoot, 'skills'))),
-        codex: !!codexRoot && existsSync(join(codexRoot, 'skills')),
-        opencode: !!opencodeAgentsDir && existsSync(opencodeAgentsDir),
+        claude: !!claudeRoot && (hasClaudeMarker || hasClaudeAgents),
+        codex: !!codexRoot && hasCodexCoreSkill,
+        opencode: !!opencodeAgentsDir && hasOpenCodeAgents,
         paths: { claudeRoot, codexRoot, opencodeAgentsDir },
     };
 }
@@ -1986,10 +2111,10 @@ async function interactiveInit() {
     const installed = detectInstalled(scope);
     const existing = tools.filter(t => installed[t]);
 
-    let force = true;
+    let force = false;
     if (existing.length > 0) {
         console.log(`\n  ${c.yellow}${sym.warn}${c.reset} Existing installation(s) detected: ${existing.join(', ')}`);
-        force = await confirm('Overwrite existing installation(s)?', false);
+        force = await confirm('Overwrite existing WTV files? (custom files are preserved)', false);
         if (!force) {
             console.log(`\n  ${c.dim}Aborted.${c.reset}\n`);
             process.exit(0);
@@ -2020,14 +2145,15 @@ async function interactiveInit() {
 
     console.log(`  ${c.bold}Quick start:${c.reset}`);
     if (tools.includes('claude')) {
-        console.log(`    ${c.cyan}Claude Code:${c.reset} /wtv (vision-aligned) or /audit-quick, /plan-full`);
+        console.log(`    ${c.cyan}Claude Code:${c.reset} use /wtv or /wtv "your mission"`);
     }
     if (tools.includes('codex')) {
-        console.log(`    ${c.cyan}Codex CLI:${c.reset} use $wtv or $audit-quick`);
+        console.log(`    ${c.cyan}Codex CLI:${c.reset} use $wtv`);
     }
     if (tools.includes('opencode')) {
-        console.log(`    ${c.cyan}OpenCode:${c.reset} use /wtv or @team-lead`);
+        console.log(`    ${c.cyan}OpenCode:${c.reset} use @paul (masterbuilder) and ask for a plan`);
     }
+    console.log(`    ${c.dim}Tip:${c.reset} run 'wtv meet' to see the team`);
 
     console.log('');
 }
@@ -2075,7 +2201,31 @@ function initNonInteractive(scope, force, tools, customPath = null) {
     console.log(`\n  ${c.green}Installation complete!${c.reset}\n`);
 }
 
-function update(scope, tools) {
+function update(scope, tools, customPath = null) {
+    if (customPath) {
+        const selected = normalizeTools(tools);
+
+        if (selected.length !== 1) {
+            console.log(`\n  ${c.red}Error:${c.reset} Custom --path requires exactly one tool.`);
+            console.log(`  Example: wtv update --tool claude --path /tmp/claude-root\n`);
+            process.exit(1);
+        }
+
+        if (selected[0] === 'opencode') {
+            console.log(`\n  ${c.red}Error:${c.reset} Custom --path is not supported for OpenCode installs.`);
+            console.log(`  OpenCode installs to .opencode/ (project) or ~/.config/opencode (global).\n`);
+            process.exit(1);
+        }
+
+        console.log(`\n  ${c.bold}wtv${c.reset} v${getVersion()}`);
+        console.log(`  Updating custom installation: ${selected[0]} (${customPath})\n`);
+
+        doInstall({ scope, tools: selected, force: true, showProgress: true, customPath });
+
+        console.log(`\n  ${c.green}Update complete!${c.reset}\n`);
+        return;
+    }
+
     const installed = detectInstalled(scope);
     const selected = normalizeTools(tools.length ? tools : TOOL_IDS.filter(t => installed[t]));
 
@@ -2135,9 +2285,112 @@ async function uninstallInteractive(scope) {
     uninstall(scope, selected);
 }
 
-function uninstall(scope, tools) {
+function uninstall(scope, tools, customPath = null) {
     const selected = normalizeTools(tools);
+
+    const templateAgentFiles = getTemplateAgentFiles();
+    const templateSkillDirs = getTemplateSkillDirs();
+
+    const removeAgentFiles = (dir) => {
+        if (!dir || !existsSync(dir)) return 0;
+        let removedCount = 0;
+        for (const file of templateAgentFiles) {
+            const p = join(dir, file);
+            if (existsSync(p)) {
+                rmSync(p, { force: true });
+                removedCount++;
+            }
+        }
+        return removedCount;
+    };
+
+    const removeSkillDirs = (dir) => {
+        if (!dir || !existsSync(dir)) return 0;
+        let removedCount = 0;
+        for (const name of templateSkillDirs) {
+            const p = join(dir, name);
+            if (existsSync(p)) {
+                rmSync(p, { recursive: true, force: true });
+                removedCount++;
+            }
+        }
+        return removedCount;
+    };
+
+    if (customPath) {
+        if (selected.length !== 1) {
+            console.log(`\n  ${c.red}Error:${c.reset} Custom --path requires exactly one tool.`);
+            console.log(`  Example: wtv uninstall --tool claude --path /tmp/claude-root\n`);
+            process.exit(1);
+        }
+
+        if (selected[0] === 'opencode') {
+            console.log(`\n  ${c.red}Error:${c.reset} Custom --path is not supported for OpenCode installs.`);
+            console.log(`  OpenCode installs to .opencode/ (project) or ~/.config/opencode (global).\n`);
+            process.exit(1);
+        }
+
+        const tool = selected[0];
+        const root = getRootDirForTool(tool, scope, customPath);
+        if (!root) {
+            console.log(`\n  ${c.red}Error:${c.reset} Unable to determine directory for ${tool}.\n`);
+            process.exit(1);
+        }
+
+        console.log(`\n  ${c.bold}wtv${c.reset} v${getVersion()}`);
+        console.log(`  Uninstalling custom installation: ${tool} (${customPath})\n`);
+
+        let removed = false;
+
+        if (tool === 'claude') {
+            const removedAgents = removeAgentFiles(join(root, 'agents'));
+            if (removedAgents > 0) {
+                console.log(`    ${c.green}${sym.check}${c.reset} Removed ${removedAgents} Claude agents`);
+                removed = true;
+            }
+
+            const removedSkills = removeSkillDirs(join(root, 'skills'));
+            if (removedSkills > 0) {
+                console.log(`    ${c.green}${sym.check}${c.reset} Removed ${removedSkills} Claude skills`);
+                removed = true;
+            }
+
+            for (const file of ['WTV.md', 'CODEHOGG.md', '.wtv-updated', '.codehogg-updated']) {
+                const p = join(root, file);
+                if (existsSync(p)) {
+                    rmSync(p, { force: true });
+                    removed = true;
+                }
+            }
+        }
+
+        if (tool === 'codex') {
+            const removedSkills = removeSkillDirs(join(root, 'skills'));
+            if (removedSkills > 0) {
+                console.log(`    ${c.green}${sym.check}${c.reset} Removed ${removedSkills} Codex skills`);
+                removed = true;
+            }
+
+            for (const file of ['.wtv-updated', '.codehogg-updated']) {
+                const p = join(root, file);
+                if (existsSync(p)) {
+                    rmSync(p, { force: true });
+                    removed = true;
+                }
+            }
+        }
+
+        if (removed) {
+            console.log(`\n  ${c.green}Uninstall complete.${c.reset}\n`);
+        } else {
+            console.log(`\n  ${c.dim}Nothing to uninstall.${c.reset}\n`);
+        }
+
+        return;
+    }
+
     const home = getHomedir();
+    const installed = detectInstalled(scope);
 
     const claudeRoot = scope === 'global'
         ? (home ? join(home, '.claude') : null)
@@ -2150,38 +2403,48 @@ function uninstall(scope, tools) {
     const opencodeRoot = getOpenCodeAgentRoot(scope);
     const opencodeAgentsDir = getOpenCodeAgentDir(scope);
 
-    const keepingClaudeSkills =
-        (selected.includes('claude') && !selected.includes('opencode') && opencodeAgentsDir && existsSync(opencodeAgentsDir)) ||
-        (selected.includes('opencode') && !selected.includes('claude') && claudeRoot && existsSync(join(claudeRoot, 'agents')));
+    const remainingClaude = installed.claude && !selected.includes('claude');
+    const remainingOpenCode = installed.opencode && !selected.includes('opencode');
+    const keepWtvSkills = remainingClaude || remainingOpenCode;
 
     console.log(`\n  ${c.bold}wtv${c.reset} v${getVersion()}`);
     console.log(`  Uninstalling (${scope}) for: ${selected.join(', ')}\n`);
 
     let removed = false;
+    let removedWtvSkillsFromClaude = false;
 
     if (selected.includes('claude') && claudeRoot) {
         const agentsDir = join(claudeRoot, 'agents');
-        if (existsSync(agentsDir)) {
-            rmSync(agentsDir, { recursive: true, force: true });
-            console.log(`    ${c.green}${sym.check}${c.reset} Removed .claude/agents/`);
+        const removedAgents = removeAgentFiles(agentsDir);
+        if (removedAgents > 0) {
+            console.log(`    ${c.green}${sym.check}${c.reset} Removed ${removedAgents} Claude agents`);
             removed = true;
         }
 
-        if (!keepingClaudeSkills) {
+        if (!keepWtvSkills) {
             const skillsDir = join(claudeRoot, 'skills');
-            if (existsSync(skillsDir)) {
-                rmSync(skillsDir, { recursive: true, force: true });
-                console.log(`    ${c.green}${sym.check}${c.reset} Removed .claude/skills/`);
+            const removedSkills = removeSkillDirs(skillsDir);
+            if (removedSkills > 0) {
+                console.log(`    ${c.green}${sym.check}${c.reset} Removed ${removedSkills} Claude skills`);
                 removed = true;
             }
+            removedWtvSkillsFromClaude = true;
+
+            for (const tsFile of ['.wtv-updated', '.codehogg-updated']) {
+                const ts = join(claudeRoot, tsFile);
+                if (existsSync(ts)) {
+                    rmSync(ts, { force: true });
+                    removed = true;
+                }
+            }
         } else {
-            console.log(`    ${c.dim}Keeping .claude/skills/ (shared with other tool)${c.reset}`);
+            console.log(`    ${c.dim}Keeping wtv skills in .claude/skills (still needed)${c.reset}`);
         }
 
-        for (const file of ['WTV.md', 'CODEHOGG.md', '.wtv-updated', '.codehogg-updated']) {
+        for (const file of ['WTV.md', 'CODEHOGG.md']) {
             const p = join(claudeRoot, file);
             if (existsSync(p)) {
-                rmSync(p);
+                rmSync(p, { force: true });
                 removed = true;
             }
         }
@@ -2189,24 +2452,25 @@ function uninstall(scope, tools) {
 
     if (selected.includes('codex') && codexRoot) {
         const skillsDir = join(codexRoot, 'skills');
-        if (existsSync(skillsDir)) {
-            rmSync(skillsDir, { recursive: true, force: true });
-            console.log(`    ${c.green}${sym.check}${c.reset} Removed .codex/skills/`);
+        const removedSkills = removeSkillDirs(skillsDir);
+        if (removedSkills > 0) {
+            console.log(`    ${c.green}${sym.check}${c.reset} Removed ${removedSkills} Codex skills`);
             removed = true;
         }
+
         for (const tsFile of ['.wtv-updated', '.codehogg-updated']) {
             const ts = join(codexRoot, tsFile);
             if (existsSync(ts)) {
-                rmSync(ts);
+                rmSync(ts, { force: true });
                 removed = true;
             }
         }
     }
 
     if (selected.includes('opencode')) {
-        if (opencodeAgentsDir && existsSync(opencodeAgentsDir)) {
-            rmSync(opencodeAgentsDir, { recursive: true, force: true });
-            console.log(`    ${c.green}${sym.check}${c.reset} Removed .opencode/agent/`);
+        const removedAgents = removeAgentFiles(opencodeAgentsDir);
+        if (removedAgents > 0) {
+            console.log(`    ${c.green}${sym.check}${c.reset} Removed ${removedAgents} OpenCode agents`);
             removed = true;
         }
 
@@ -2214,19 +2478,27 @@ function uninstall(scope, tools) {
             for (const tsFile of ['.wtv-updated', '.codehogg-updated']) {
                 const ts = join(opencodeRoot, tsFile);
                 if (existsSync(ts)) {
-                    rmSync(ts);
+                    rmSync(ts, { force: true });
                     removed = true;
                 }
             }
         }
 
-        if (!keepingClaudeSkills && claudeRoot) {
-            // If OpenCode was installed without Claude, its skills live in .claude/skills.
+        // OpenCode skills live in .claude/skills
+        if (!keepWtvSkills && claudeRoot && !removedWtvSkillsFromClaude) {
             const skillsDir = join(claudeRoot, 'skills');
-            if (existsSync(skillsDir) && !existsSync(join(claudeRoot, 'agents'))) {
-                rmSync(skillsDir, { recursive: true, force: true });
-                console.log(`    ${c.green}${sym.check}${c.reset} Removed .claude/skills/ (OpenCode skill path)`);
+            const removedSkills = removeSkillDirs(skillsDir);
+            if (removedSkills > 0) {
+                console.log(`    ${c.green}${sym.check}${c.reset} Removed ${removedSkills} OpenCode skills (via .claude/skills)`);
                 removed = true;
+            }
+
+            for (const tsFile of ['.wtv-updated', '.codehogg-updated']) {
+                const ts = join(claudeRoot, tsFile);
+                if (existsSync(ts)) {
+                    rmSync(ts, { force: true });
+                    removed = true;
+                }
             }
         }
     }
@@ -2243,36 +2515,135 @@ function status(customPath = null) {
 
     const home = getHomedir();
 
+    const templateAgentFiles = getTemplateAgentFiles();
+    const legacyAgentFiles = getLegacyAgentFiles();
+    const templateSkillDirs = getTemplateSkillDirs();
+
     const showClaude = (label, root) => {
-        const agents = countFiles(join(root, 'agents'));
-        const skills = countDirs(join(root, 'skills'));
+        const agentsDir = join(root, 'agents');
+        const skillsDir = join(root, 'skills');
+
+        const agents = countInstalledFiles(agentsDir, templateAgentFiles);
+        const skills = countInstalledDirs(skillsDir, templateSkillDirs);
+        const legacyAgents = countInstalledFiles(agentsDir, legacyAgentFiles);
+
+        const hasLegacyCoreSkill = existsSync(join(skillsDir, 'codehogg'));
+        const hasNewCoreSkill = existsSync(join(skillsDir, 'wtv'));
+        const hasTimestamp = existsSync(join(root, '.wtv-updated')) || existsSync(join(root, '.codehogg-updated'));
+        const hasMarkerDoc = existsSync(join(root, 'WTV.md')) || existsSync(join(root, 'CODEHOGG.md'));
+
+        const installed = hasTimestamp || hasMarkerDoc || hasNewCoreSkill || hasLegacyCoreSkill || agents > 0 || legacyAgents > 0;
 
         console.log(`  ${label}:`);
-        if (agents > 0 || skills > 0) {
-            console.log(`    ${c.green}${sym.check}${c.reset} ${agents} agents, ${skills} skills`);
+        if (installed) {
+            console.log(`    ${c.green}${sym.check}${c.reset} ${agents}/${templateAgentFiles.length} agents, ${skills}/${templateSkillDirs.length} skills`);
+            if (legacyAgents > 0 && agents === 0) {
+                console.log(`    ${c.yellow}${sym.warn}${c.reset} Legacy agents detected (run: wtv update --tool claude)`);
+            } else if (skills > 0 && agents === 0) {
+                console.log(`    ${c.yellow}${sym.warn}${c.reset} Agents missing (run: wtv init --claude)`);
+            }
+
+            if (agents > 0 && skills === 0) {
+                console.log(`    ${c.yellow}${sym.warn}${c.reset} Skills missing (run: wtv init --claude)`);
+            }
+
+            if (!hasNewCoreSkill && hasLegacyCoreSkill) {
+                console.log(`    ${c.yellow}${sym.warn}${c.reset} Legacy core skill detected (codehogg). Run: wtv update --tool claude`);
+            } else if (!hasNewCoreSkill && !hasLegacyCoreSkill) {
+                console.log(`    ${c.yellow}${sym.warn}${c.reset} Core skill missing (wtv). Run: wtv update --tool claude`);
+            }
+
+            if (skills > 0 && skills < templateSkillDirs.length) {
+                console.log(`    ${c.yellow}${sym.warn}${c.reset} ${templateSkillDirs.length - skills} skills missing (run: wtv update --tool claude)`);
+            }
+
+            if (agents > 0 && agents < templateAgentFiles.length) {
+                console.log(`    ${c.dim}${sym.info}${c.reset} Partial agent set installed (custom selection?)`);
+            }
         } else {
             console.log(`    ${c.dim}Not installed${c.reset}`);
+            if (skills > 0) {
+                console.log(`    ${c.dim}${sym.info}${c.reset} Found ${skills}/${templateSkillDirs.length} matching skills (run: wtv init --claude)`);
+            }
         }
     };
 
     const showCodex = (label, root) => {
-        const skills = countDirs(join(root, 'skills'));
+        const skillsDir = join(root, 'skills');
+        const skills = countInstalledDirs(skillsDir, templateSkillDirs);
+
+        const hasLegacyCoreSkill = existsSync(join(skillsDir, 'codehogg'));
+        const hasNewCoreSkill = existsSync(join(skillsDir, 'wtv'));
+        const hasTimestamp = existsSync(join(root, '.wtv-updated')) || existsSync(join(root, '.codehogg-updated'));
+
+        const installed = hasTimestamp || hasNewCoreSkill || hasLegacyCoreSkill;
+
         console.log(`  ${label}:`);
-        if (skills > 0) {
-            console.log(`    ${c.green}${sym.check}${c.reset} ${skills} skills`);
+        if (installed) {
+            console.log(`    ${c.green}${sym.check}${c.reset} ${skills}/${templateSkillDirs.length} skills`);
+
+            if (!hasNewCoreSkill && hasLegacyCoreSkill) {
+                console.log(`    ${c.yellow}${sym.warn}${c.reset} Legacy core skill detected (codehogg). Run: wtv update --tool codex`);
+            } else if (!hasNewCoreSkill && !hasLegacyCoreSkill) {
+                console.log(`    ${c.yellow}${sym.warn}${c.reset} Core skill missing (wtv). Run: wtv update --tool codex`);
+            }
+
+            if (skills > 0 && skills < templateSkillDirs.length) {
+                console.log(`    ${c.yellow}${sym.warn}${c.reset} ${templateSkillDirs.length - skills} skills missing (run: wtv update --tool codex)`);
+            }
         } else {
             console.log(`    ${c.dim}Not installed${c.reset}`);
+            if (skills > 0) {
+                console.log(`    ${c.dim}${sym.info}${c.reset} Found ${skills}/${templateSkillDirs.length} matching skills (run: wtv init --codex)`);
+            }
         }
     };
 
     const showOpenCode = (label, agentsDir, claudeSkillsDir) => {
-        const agents = countFilesFlat(agentsDir, '.md');
-        const skills = countDirs(claudeSkillsDir);
+        const agents = countInstalledFiles(agentsDir, templateAgentFiles);
+        const skills = countInstalledDirs(claudeSkillsDir, templateSkillDirs);
+        const legacyAgents = countInstalledFiles(agentsDir, legacyAgentFiles);
+
+        const agentRoot = dirname(agentsDir);
+        const hasTimestamp = existsSync(join(agentRoot, '.wtv-updated')) || existsSync(join(agentRoot, '.codehogg-updated'));
+
+        const hasLegacyCoreSkill = existsSync(join(claudeSkillsDir, 'codehogg'));
+        const hasNewCoreSkill = existsSync(join(claudeSkillsDir, 'wtv'));
+
+        const installed = hasTimestamp || agents > 0 || legacyAgents > 0;
+
         console.log(`  ${label}:`);
-        if (agents > 0 || skills > 0) {
-            console.log(`    ${c.green}${sym.check}${c.reset} ${agents} agents, ${skills} skills (via .claude/skills)`);
+        if (installed) {
+            const suffix = skills > 0 ? ' (via .claude/skills)' : '';
+            console.log(`    ${c.green}${sym.check}${c.reset} ${agents}/${templateAgentFiles.length} agents, ${skills}/${templateSkillDirs.length} skills${suffix}`);
+            if (legacyAgents > 0 && agents === 0) {
+                console.log(`    ${c.yellow}${sym.warn}${c.reset} Legacy agents detected (run: wtv update --tool opencode)`);
+            } else if (skills > 0 && agents === 0) {
+                console.log(`    ${c.yellow}${sym.warn}${c.reset} Agents missing (run: wtv init --opencode)`);
+            }
+
+            if (agents > 0 && skills === 0) {
+                console.log(`    ${c.yellow}${sym.warn}${c.reset} Skills missing (run: wtv init --opencode)`);
+            }
+
+            if (!hasNewCoreSkill && hasLegacyCoreSkill) {
+                console.log(`    ${c.yellow}${sym.warn}${c.reset} Legacy core skill detected (codehogg). Run: wtv update --tool opencode`);
+            } else if (!hasNewCoreSkill && !hasLegacyCoreSkill) {
+                console.log(`    ${c.yellow}${sym.warn}${c.reset} Core skill missing (wtv). Run: wtv update --tool opencode`);
+            }
+
+            if (skills > 0 && skills < templateSkillDirs.length) {
+                console.log(`    ${c.yellow}${sym.warn}${c.reset} ${templateSkillDirs.length - skills} skills missing (run: wtv update --tool opencode)`);
+            }
+
+            if (agents > 0 && agents < templateAgentFiles.length) {
+                console.log(`    ${c.dim}${sym.info}${c.reset} Partial agent set installed (custom selection?)`);
+            }
         } else {
             console.log(`    ${c.dim}Not installed${c.reset}`);
+            if (skills > 0 || hasNewCoreSkill || hasLegacyCoreSkill) {
+                console.log(`    ${c.dim}${sym.info}${c.reset} Skills present in .claude/skills (run: wtv init --opencode)`);
+            }
         }
     };
 
@@ -2900,10 +3271,12 @@ function showHelp() {
     console.log(`${pad}  ${c.cyan}(no command)${c.reset}  Dashboard - show agents and vision`);
     console.log(`${pad}  ${c.cyan}agents${c.reset}        List and manage agents`);
     console.log(`${pad}  ${c.cyan}init${c.reset}          Install agents and create VISION.md`);
-    console.log(`${pad}  ${c.cyan}meet${c.reset}          Meet Paul and the Artisans`);
-    console.log(`${pad}  ${c.cyan}vision${c.reset}        Show VISION.md status`);
-    console.log(`${pad}  ${c.cyan}status${c.reset}        Show installation status`);
     console.log(`${pad}  ${c.cyan}update${c.reset}        Update installed tools`);
+    console.log(`${pad}  ${c.cyan}uninstall${c.reset}     Remove installed tools`);
+    console.log(`${pad}  ${c.cyan}status${c.reset}        Show installation status`);
+    console.log(`${pad}  ${c.cyan}vision${c.reset}        Show VISION.md status`);
+    console.log(`${pad}  ${c.cyan}log${c.reset}           Show task logs`);
+    console.log(`${pad}  ${c.cyan}meet${c.reset}          Meet Paul and the Artisans`);
     console.log(`${pad}  ${c.cyan}help${c.reset}          Show this help\n`);
 
     console.log(`${pad}${c.bold}Agent Commands${c.reset}`);
@@ -2915,7 +3288,7 @@ function showHelp() {
     console.log(`${pad}  ${c.cyan}agents rm${c.reset} <name>    Remove agent\n`);
 
     console.log(`${pad}${c.bold}Habakkuk Workflow${c.reset}  ${c.dim}"Write the vision, make it plain"${c.reset}`);
-    console.log(`${pad}  ${c.cyan}board${c.reset}               Show kanban board`);
+    console.log(`${pad}  ${c.cyan}board${c.reset} [--all]        Show kanban board`);
     console.log(`${pad}  ${c.cyan}cry${c.reset} "desc"          Enter a problem or need`);
     console.log(`${pad}  ${c.cyan}wait${c.reset} <id>           Move to waiting (seeking)`);
     console.log(`${pad}  ${c.cyan}vision${c.reset} <id>         Move to vision (answer received)`);
@@ -2926,16 +3299,23 @@ function showHelp() {
     console.log(`${pad}  ${c.cyan}stones${c.reset}              View completed works\n`);
 
     console.log(`${pad}${c.bold}Options${c.reset}`);
-    console.log(`${pad}  ${c.dim}--global, -g${c.reset}     Global scope`);
-    console.log(`${pad}  ${c.dim}--force, -f${c.reset}      Overwrite existing`);
-    console.log(`${pad}  ${c.dim}--claude${c.reset}         Target Claude Code`);
-    console.log(`${pad}  ${c.dim}--opencode${c.reset}       Target OpenCode\n`);
+    console.log(`${pad}  ${c.dim}--global, -g${c.reset}      Global scope`);
+    console.log(`${pad}  ${c.dim}--local, -l${c.reset}       Project scope (default)`);
+    console.log(`${pad}  ${c.dim}--force, -f${c.reset}       Overwrite existing`);
+    console.log(`${pad}  ${c.dim}--tool <tool>${c.reset}     Tool: claude | codex | opencode`);
+    console.log(`${pad}  ${c.dim}--path <dir>${c.reset}      Install/check a custom directory`);
+    console.log(`${pad}  ${c.dim}--claude${c.reset}          Target Claude Code`);
+    console.log(`${pad}  ${c.dim}--codex${c.reset}           Target Codex CLI`);
+    console.log(`${pad}  ${c.dim}--opencode${c.reset}         Target OpenCode\n`);
 
     console.log(`${pad}${c.bold}Examples${c.reset}`);
-    console.log(`${pad}  ${c.green}wtv${c.reset}                       ${c.dim}# Dashboard${c.reset}`);
-    console.log(`${pad}  ${c.green}wtv agents${c.reset}                ${c.dim}# List agents${c.reset}`);
-    console.log(`${pad}  ${c.green}wtv agents add my-artisan${c.reset} ${c.dim}# Create agent${c.reset}`);
-    console.log(`${pad}  ${c.green}wtv init --opencode${c.reset}       ${c.dim}# Install for OpenCode${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv${c.reset}                          ${c.dim}# Dashboard${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv agents${c.reset}                   ${c.dim}# List agents${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv init --claude${c.reset}            ${c.dim}# Install for Claude Code${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv init --opencode${c.reset}          ${c.dim}# Install for OpenCode${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv init --codex${c.reset}            ${c.dim}# Install for Codex CLI${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv board --all${c.reset}              ${c.dim}# Show full kanban board${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv uninstall --tool opencode${c.reset} ${c.dim}# Remove OpenCode install${c.reset}`);
     console.log('');
 }
 
@@ -2951,6 +3331,7 @@ function parseArgs(args) {
         tools: [],
         task: null,
         date: null,
+        all: false,
     };
 
     let positionalCount = 0;
@@ -2983,14 +3364,27 @@ function parseArgs(args) {
             continue;
         }
 
+        if (a === '--all') {
+            opts.all = true;
+            continue;
+        }
+
         if (a === '--path') {
-            opts.path = args[i + 1] ?? null;
+            const v = args[i + 1];
+            if (!v || v.startsWith('-')) {
+                throw new Error("--path requires a directory (e.g. '--path /tmp/my-claude')");
+            }
+            opts.path = v;
             i++;
             continue;
         }
 
         if (a === '--tool') {
-            opts.tools.push(args[i + 1] ?? null);
+            const v = args[i + 1];
+            if (!v || v.startsWith('-')) {
+                throw new Error("--tool requires a value: claude | codex | opencode");
+            }
+            opts.tools.push(v);
             i++;
             continue;
         }
@@ -3011,19 +3405,27 @@ function parseArgs(args) {
         }
 
         if (a === '--task') {
-            opts.task = args[i + 1] ?? null;
+            const v = args[i + 1];
+            if (!v || v.startsWith('-')) {
+                throw new Error("--task requires a task id (e.g. '--task 2026-01-15-001')");
+            }
+            opts.task = v;
             i++;
             continue;
         }
 
         if (a === '--date') {
-            opts.date = args[i + 1] ?? null;
+            const v = args[i + 1];
+            if (!v || v.startsWith('-')) {
+                throw new Error("--date requires YYYY-MM-DD (e.g. '--date 2026-01-15')");
+            }
+            opts.date = v;
             i++;
             continue;
         }
 
         if (a.startsWith('-')) {
-            continue;
+            throw new Error(`Unknown option: ${a}`);
         }
 
         // Positional arguments
@@ -3041,7 +3443,15 @@ function parseArgs(args) {
 }
 
 export async function run(args) {
-    const opts = parseArgs(args);
+    let opts;
+    try {
+        opts = parseArgs(args);
+    } catch (err) {
+        console.log(`\n  ${c.red}Error:${c.reset} ${err.message}\n`);
+        showHelp();
+        process.exit(1);
+    }
+
     const scope = opts.global ? 'global' : 'project';
 
     if (opts.command !== 'version') {
@@ -3054,20 +3464,30 @@ export async function run(args) {
             if (nonInteractive) {
                 initNonInteractive(scope, opts.force, opts.tools, opts.path);
             } else {
+                if (!process.stdout.isTTY) {
+                    console.log(`\n  ${c.red}Error:${c.reset} init requires interactive TTY, or pass flags.`);
+                    console.log(`  Example: wtv init --claude\n`);
+                    process.exit(1);
+                }
                 await interactiveInit();
             }
             break;
         }
 
         case 'update': {
-            update(scope, opts.tools);
+            update(scope, opts.tools, opts.path);
             break;
         }
 
         case 'uninstall':
         case 'remove': {
+            if (opts.path && opts.tools.length === 0) {
+                console.log(`\n  ${c.red}Error:${c.reset} uninstall with --path requires --tool.\n`);
+                process.exit(1);
+            }
+
             if (opts.tools.length > 0) {
-                uninstall(scope, opts.tools);
+                uninstall(scope, opts.tools, opts.path);
             } else if (process.stdout.isTTY) {
                 await uninstallInteractive(scope);
             } else {
@@ -3168,7 +3588,7 @@ export async function run(args) {
         // ===== HABAKKUK WORKFLOW COMMANDS =====
 
         case 'board': {
-            const showAll = opts.subcommand === '--all' || opts.subcommand === 'all';
+            const showAll = opts.all || opts.subcommand === 'all';
             habakkukBoard(showAll);
             break;
         }
