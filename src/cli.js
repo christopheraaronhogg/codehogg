@@ -1266,6 +1266,61 @@ function copyDir(src, dest) {
     return copied;
 }
 
+// ============================================================================
+// WTV SECTION MARKERS (for safe append/remove in tool config files)
+// ============================================================================
+
+const WTV_SECTION_START = '<!-- WTV:START -->';
+const WTV_SECTION_END = '<!-- WTV:END -->';
+
+const WTV_SECTION_CONTENT = `${WTV_SECTION_START}
+## Vision-Driven Development
+
+This project uses WTV for vision-driven AI development.
+
+### Vision Context
+- Read \`VISION.md\` from project root for core project vision
+- Read all markdown files in \`vision/\` directory for additional context (roadmap, values, ideas)
+- If no vision exists, suggest running \`wtv init\` to create one
+
+### Agent System
+- Expert agents are defined in the tool's agents directory
+- Read \`AGENTS.md\` for agent coordination rules
+${WTV_SECTION_END}`;
+
+function appendWtvSection(filePath) {
+    let content = '';
+    if (existsSync(filePath)) {
+        content = readFileSync(filePath, 'utf8');
+        // Already has WTV section? Skip.
+        if (content.includes(WTV_SECTION_START)) {
+            return false;
+        }
+    }
+
+    // Append with newlines
+    const newContent = content.trimEnd() + '\n\n' + WTV_SECTION_CONTENT + '\n';
+    writeFileSync(filePath, newContent);
+    return true;
+}
+
+function removeWtvSection(filePath) {
+    if (!existsSync(filePath)) return false;
+
+    let content = readFileSync(filePath, 'utf8');
+    if (!content.includes(WTV_SECTION_START)) {
+        return false;
+    }
+
+    // Remove WTV section using regex
+    const startEscaped = WTV_SECTION_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const endEscaped = WTV_SECTION_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\n*${startEscaped}[\\s\\S]*?${endEscaped}\n*`, 'g');
+    const newContent = content.replace(regex, '\n');
+    writeFileSync(filePath, newContent.trimEnd() + '\n');
+    return true;
+}
+
 function countFiles(dir) {
     if (!existsSync(dir)) return 0;
     let count = 0;
@@ -1303,13 +1358,13 @@ function prompt(question) {
 }
 
 async function select(question, options) {
-    console.log(`\n  ${c.bold}${question}${c.reset}\n`);
+    console.log(`\n  ${c.bold}${question}${c.reset} \n`);
     options.forEach((opt, i) => {
-        console.log(`    ${c.cyan}${i + 1}${c.reset}) ${opt.label}`);
-        if (opt.desc) console.log(`       ${c.dim}${opt.desc}${c.reset}`);
+        console.log(`    ${c.cyan}${i + 1}${c.reset}) ${opt.label} `);
+        if (opt.desc) console.log(`       ${c.dim}${opt.desc}${c.reset} `);
     });
 
-    const answer = await prompt(`\n  Enter choice (1-${options.length}): `);
+    const answer = await prompt(`\n  Enter choice(1 - ${options.length}): `);
     const idx = parseInt(answer, 10) - 1;
 
     if (idx >= 0 && idx < options.length) {
@@ -1330,9 +1385,9 @@ function printBanner() {
     const version = getVersion();
     console.log('');
     console.log(drawBox([
-        `  ${c.bold}${c.magenta}wtv${c.reset} ${c.dim}v${version}${c.reset}`,
-        `  ${c.dim}10 agents ${sym.bullet} 21 skills${c.reset}`,
-        `  ${c.dim}Claude • Codex • OpenCode • Gemini • Antigravity${c.reset}`,
+        `  ${c.bold}${c.magenta}wtv${c.reset} ${c.dim}v${version}${c.reset} `,
+        `  ${c.dim} 10 agents ${sym.bullet} 21 skills${c.reset} `,
+        `  ${c.dim} Claude • Codex • OpenCode • Gemini • Antigravity${c.reset} `,
     ], { style: 'round', color: c.magenta, padding: 0 }));
     console.log('');
 }
@@ -1346,13 +1401,13 @@ const AVATARS = {
     paul: `
        ${c.yellow}___________${c.reset}
       ${c.yellow}/           \\${c.reset}
-     ${c.yellow}|  ${c.bold}◈     ◈${c.reset}${c.yellow}  |${c.reset}
-     ${c.yellow}|     ${c.bold}▽${c.reset}${c.yellow}     |${c.reset}
-     ${c.yellow}|   ${c.bold}═════${c.reset}${c.yellow}   |${c.reset}
-      ${c.yellow}\\  ${c.dim}PLAN${c.reset}${c.yellow}  /${c.reset}
+     ${c.yellow}| ${c.bold}◈     ◈${c.reset}${c.yellow}  | ${c.reset}
+     ${c.yellow}| ${c.bold}▽${c.reset}${c.yellow}     | ${c.reset}
+     ${c.yellow}| ${c.bold}═════${c.reset}${c.yellow}   | ${c.reset}
+      ${c.yellow} \\  ${c.dim}PLAN${c.reset}${c.yellow}  /${c.reset}
        ${c.yellow}╔═══════╗${c.reset}
        ${c.yellow}║${c.dim}VISION${c.reset}${c.yellow}║${c.reset}
-       ${c.yellow}╚═══════╝${c.reset}`,
+       ${c.yellow}╚═══════╝${c.reset} `,
 
     nehemiah: `
        ${c.red}╔═══════╗${c.reset}
@@ -1363,7 +1418,7 @@ const AVATARS = {
       ${c.red}║ ${c.bold}◇ ◇ ◇${c.reset}${c.red} ║${c.reset}
       ${c.red}╚════╦════╝${c.reset}
            ${c.red}║${c.reset}
-       ${c.dim}[SHIELD]${c.reset}`,
+       ${c.dim} [SHIELD]${c.reset} `,
 
     bezaleel: `
           ${c.blue}△${c.reset}
@@ -1374,7 +1429,7 @@ const AVATARS = {
      ${c.blue}║ ║   ║ ║${c.reset}
      ${c.blue}║ ║   ║ ║${c.reset}
      ${c.blue}╩═╩═══╩═╩${c.reset}
-     ${c.dim}[PILLARS]${c.reset}`,
+     ${c.dim} [PILLARS]${c.reset} `,
 
     hiram: `
       ${c.green}┌─────────┐${c.reset}
@@ -1384,7 +1439,7 @@ const AVATARS = {
       ${c.green}│  ${c.bold}│${c.reset}${c.green}  │${c.reset}
       ${c.green}│  ${c.bold}▼${c.reset}${c.green}  │${c.reset}
       ${c.green}└──${c.bold}◎${c.reset}${c.green}──┘${c.reset}
-      ${c.dim}[SERVER]${c.reset}`,
+      ${c.dim} [SERVER]${c.reset} `,
 
     aholiab: `
       ${c.magenta}╭─────────╮${c.reset}
@@ -1394,7 +1449,7 @@ const AVATARS = {
       ${c.magenta}│ ${c.bold}▪ ▪ ▪${c.reset}${c.magenta} │${c.reset}
       ${c.magenta}│ ${c.bold}█████${c.reset}${c.magenta} │${c.reset}
       ${c.magenta}╰─────────╯${c.reset}
-       ${c.dim}[SCREEN]${c.reset}`,
+       ${c.dim} [SCREEN]${c.reset} `,
 
     solomon: `
         ${c.cyan}╭───────╮${c.reset}
@@ -1405,7 +1460,7 @@ const AVATARS = {
       ${c.cyan}│${c.bold}═════════${c.reset}${c.cyan}│${c.reset}
       ${c.cyan}│${c.bold}═════════${c.reset}${c.cyan}│${c.reset}
        ${c.cyan}╲───────╱${c.reset}
-        ${c.dim}[DATA]${c.reset}`,
+        ${c.dim} [DATA]${c.reset} `,
 
     zerubbabel: `
         ${c.yellow}◎${c.reset}
@@ -1416,18 +1471,18 @@ const AVATARS = {
        ${c.yellow}◎═══◎${c.reset}
       ${c.yellow}╱     ╲${c.reset}
      ${c.yellow}◎       ◎${c.reset}
-     ${c.dim}[PIPELINE]${c.reset}`,
+     ${c.dim} [PIPELINE]${c.reset} `,
 
     ezra: `
          ${c.blue}○${c.reset}
         ${c.blue}╱ ╲${c.reset}
-       ${c.blue}(${c.bold}◉ ◉${c.reset}${c.blue})${c.reset}
+       ${c.blue} (${c.bold}◉ ◉${c.reset}${c.blue})${c.reset}
        ${c.blue}│ ${c.bold}⌓${c.reset}${c.blue} │${c.reset}
       ${c.blue}╭┴───┴╮${c.reset}
-     ${c.blue}(  ${c.bold}◎${c.reset}${c.blue}   )${c.reset}
+     ${c.blue} (${c.bold}◎${c.reset}${c.blue}   )${c.reset}
       ${c.blue}╲  ${c.bold}│${c.reset}${c.blue}  ╱${c.reset}
        ${c.blue}╰───╯${c.reset}
-       ${c.dim}[LENS]${c.reset}`,
+       ${c.dim} [LENS]${c.reset} `,
 
     moses: `
          ${c.green}★${c.reset}
@@ -1438,7 +1493,7 @@ const AVATARS = {
       ${c.green}│ ${c.bold}☰ ☰${c.reset}${c.green} │${c.reset}
       ${c.green}│ ${c.bold}☰ ☰${c.reset}${c.green} │${c.reset}
       ${c.green}╰───────╯${c.reset}
-       ${c.dim}[SCROLL]${c.reset}`,
+       ${c.dim} [SCROLL]${c.reset} `,
 
     david: `
        ${c.magenta}╭─────────╮${c.reset}
@@ -1447,7 +1502,7 @@ const AVATARS = {
        ${c.magenta}│   ${c.bold}╱╲${c.reset}${c.magenta}  │${c.reset}
        ${c.magenta}│  ${c.bold}✎${c.reset}${c.magenta}    │${c.reset}
        ${c.magenta}╰─────────╯${c.reset}
-       ${c.dim}[HARP]${c.reset}`,
+       ${c.dim} [HARP]${c.reset} `,
 };
 
 const ARTISAN_DEFS = [
@@ -1562,16 +1617,16 @@ const ARTISAN_DEFS = [
 ];
 
 async function selectArtisans() {
-    console.log(`\n  ${c.bold}Select Your Artisans${c.reset}`);
-    console.log(`  ${c.dim}These artisans will counsel Paul and execute tasks.${c.reset}`);
+    console.log(`\n  ${c.bold}Select Your Artisans${c.reset} `);
+    console.log(`  ${c.dim}These artisans will counsel Paul and execute tasks.${c.reset} `);
     console.log(`  ${c.dim}Enter numbers separated by spaces, or press Enter for all.${c.reset}\n`);
 
     ARTISAN_DEFS.forEach((a, i) => {
-        console.log(`    ${a.color}${i + 1}${c.reset}) ${a.color}${c.bold}${a.name}${c.reset}`);
-        console.log(`       ${c.dim}${a.domain}${c.reset}`);
+        console.log(`    ${a.color}${i + 1}${c.reset}) ${a.color}${c.bold}${a.name}${c.reset} `);
+        console.log(`       ${c.dim}${a.domain}${c.reset} `);
     });
 
-    const answer = await prompt(`\n  Select (1-${ARTISAN_DEFS.length}, space-separated) [${c.dim}all${c.reset}]: `);
+    const answer = await prompt(`\n  Select(1 - ${ARTISAN_DEFS.length}, space - separated)[${c.dim}all${c.reset}]: `);
 
     if (!answer.trim()) {
         return ARTISAN_DEFS.map(a => a.id);
@@ -1597,12 +1652,12 @@ async function meetTheTeam() {
   ${c.bold}${c.magenta}═══════════════════════════════════════════════════════════════${c.reset}
   ${c.bold}                     MEET YOUR TEAM${c.reset}
   ${c.magenta}═══════════════════════════════════════════════════════════════${c.reset}
-`);
+    `);
 
     await sleep(pause);
 
     // The Vision
-    console.log(`  ${c.dim}"And the LORD answered me, and said,${c.reset}`);
+    console.log(`  ${c.dim} "And the LORD answered me, and said,${c.reset}`);
     console.log(`  ${c.dim} Write the vision, and make [it] plain upon tables,${c.reset}`);
     console.log(`  ${c.dim} that he may run that readeth it."${c.reset}`);
     console.log(`  ${c.dim}                                    — Habakkuk 2:2 (KJV PCE)${c.reset}`);
@@ -1980,6 +2035,18 @@ function installStandardTool(toolName, targetDir, { force, showProgress, selecte
     }
 
     writeTimestamp(targetDir);
+
+    // Append WTV section to tool's config file (if it exists)
+    const toolConfigMap = {
+        'Claude': join(process.cwd(), 'CLAUDE.md'),
+        'Codex': join(process.cwd(), 'AGENTS.md'),
+        'Gemini': join(process.cwd(), 'GEMINI.md'),
+        'Antigravity': join(process.cwd(), 'AGENTS.md'),
+    };
+    const configFile = toolConfigMap[toolName];
+    if (configFile) {
+        appendWtvSection(configFile);
+    }
 
     if (showProgress) {
         console.log(`    ${c.green}${sym.check}${c.reset} ${agentCount} ${toolName} agents`);
@@ -2639,6 +2706,20 @@ function uninstall(scope, tools, customPath = null) {
                     removed = true;
                 }
             }
+        }
+    }
+
+    // Remove WTV section from config files if uninstalling relevant tools
+    const configFilesToClean = [];
+    if (selected.includes('claude')) configFilesToClean.push(join(process.cwd(), 'CLAUDE.md'));
+    if (selected.includes('codex')) configFilesToClean.push(join(process.cwd(), 'AGENTS.md'));
+    if (selected.includes('gemini')) configFilesToClean.push(join(process.cwd(), 'GEMINI.md'));
+    if (selected.includes('antigravity')) configFilesToClean.push(join(process.cwd(), 'AGENTS.md'));
+
+    for (const configFile of [...new Set(configFilesToClean)]) {
+        if (removeWtvSection(configFile)) {
+            console.log(`    ${c.green}${sym.check}${c.reset} Removed WTV section from ${basename(configFile)}`);
+            removed = true;
         }
     }
 
