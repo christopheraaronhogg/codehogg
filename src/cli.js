@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'url';
-import { dirname, join, resolve } from 'path';
+import { basename, dirname, join, resolve } from 'path';
 import {
     accessSync,
     constants,
