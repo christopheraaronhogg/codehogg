@@ -59,45 +59,54 @@ wtv agents fav <name>    # Toggle favorite (★)
 wtv agents rm <name>     # Remove agent
 ```
 
-The AI inside these tools can also run `npx wtv agents` to discover what's available before spawning agents.
+The AI inside these tools can also run `npx writethevision agents` to discover what's available before spawning agents.
 
 ## Installation
 
 ### Quick Start
 
 ```bash
-npx wtv init
+npx writethevision init
 ```
 
 Interactive wizard to install for one or more tools.
+
+### Global Install (short `wtv`)
+
+```bash
+npm install -g writethevision
+wtv init
+```
+
+Installs both `wtv` and `writethevision` commands.
 
 ### Non-Interactive
 
 ```bash
 # Claude Code (agents + skills)
-npx wtv init --claude
-npx wtv init --claude --global
+npx writethevision init --claude
+npx writethevision init --claude --global
 
 # OpenCode (agents + skills)
-npx wtv init --opencode
-npx wtv init --opencode --global
+npx writethevision init --opencode
+npx writethevision init --opencode --global
 
 # Codex CLI (skills only)
-npx wtv init --codex
-npx wtv init --codex --global
+npx writethevision init --codex
+npx writethevision init --codex --global
 
 # Gemini CLI (agents + skills)
-npx wtv init --gemini
+npx writethevision init --gemini
 
 # Antigravity (skills + rule)
-npx wtv init --antigravity
+npx writethevision init --antigravity
 ```
 
 ### Updates
 
 ```bash
-npx wtv update           # Update project installations
-npx wtv update --global  # Update global installations
+npx writethevision update           # Update project installations
+npx writethevision update --global  # Update global installations
 ```
 
 ## What Gets Installed
@@ -165,7 +174,7 @@ Skills contain evaluation frameworks, checklists, and report templates.
 Create a vision file that agents align to. You can use a single `VISION.md` in the root, or organize multiple vision documents in a `vision/` directory.
 
 ```bash
-npx wtv init   # Wizard helps you define it
+npx writethevision init   # Wizard helps you define it
 ```
 
 ### Directory Structure (Optional)
@@ -346,7 +355,7 @@ wtv --version            # Show version
 
 ```bash
 # 1. Install wtv for Claude Code
-npx wtv init --claude
+npx writethevision init --claude
 
 # 2. Create your vision
 # (wizard runs during init, or edit VISION.md directly)

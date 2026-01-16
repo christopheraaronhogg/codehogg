@@ -19,4 +19,4 @@ We want it to be fast, easy to install, intuitive to use, and not bloated. we wa
 MVP
 
 ## Current Focus
-Shipping. making it easily accessable on any device that can run npm wtv.
+Shipping. making it easily accessable on any device that can run `npx writethevision`.

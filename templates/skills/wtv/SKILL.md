@@ -27,7 +27,7 @@ user-invocable: true
 
 **To discover what agents are installed**, run:
 ```bash
-npx wtv agents
+npx writethevision agents
 ```
 
 ---

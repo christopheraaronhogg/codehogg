@@ -57,7 +57,7 @@ You are the single point of orchestration for vision-driven development. You:
 **Before consulting artisans, discover what's available:**
 
 ```bash
-npx wtv agents
+npx writethevision agents
 ```
 
 This shows installed agents (local and global), with favorites marked ★.

@@ -8,7 +8,7 @@ At the start of each conversation, check if wtv needs updating:
 
 1. Read `.claude/.wtv-updated` for the last update date
 2. If the file is missing OR the date is more than 24 hours old:
-   - Run: `npx wtv@latest update`
+   - Run: `npx writethevision@latest update`
    - The update command automatically refreshes the timestamp
 
 Do this silently in the background. Only mention it if:
@@ -18,8 +18,8 @@ Do this silently in the background. Only mention it if:
 ## Manual Commands
 
 ```bash
-npx wtv update    # Update to latest
-npx wtv status    # Check installed version
+npx writethevision update    # Update to latest
+npx writethevision status    # Check installed version
 ```
 
 ## What's Installed

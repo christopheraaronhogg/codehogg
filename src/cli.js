@@ -185,9 +185,16 @@ function createSpinner(text) {
     };
 }
 
+function getPackageJson() {
+    return JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'));
+}
+
 function getVersion() {
-    const pkg = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'));
-    return pkg.version;
+    return getPackageJson().version;
+}
+
+function getPackageName() {
+    return getPackageJson().name;
 }
 
 // ============================================================================
@@ -1183,7 +1190,7 @@ function checkForUpdates() {
     try {
         const notifier = updateNotifier({
             pkg: {
-                name: 'wtv',
+                name: getPackageName(),
                 version: getVersion(),
             },
             updateCheckInterval: 1000 * 60 * 60 * 24 * 7,
@@ -1195,7 +1202,7 @@ function checkForUpdates() {
 
         notifier.notify({
             message: `Update available ${c.dim}${update.current}${c.reset} → ${c.green}${update.latest}${c.reset}
-Run ${c.cyan}npx wtv update${c.reset} to get the latest version`,
+Run ${c.cyan}npx writethevision update${c.reset} to get the latest version`,
             defer: false,
             boxenOpts: {
                 padding: 1,
@@ -1207,7 +1214,7 @@ Run ${c.cyan}npx wtv update${c.reset} to get the latest version`,
         });
 
         notifier.notify({
-            message: `Update available ${c.dim}${notifier.update.current}${c.reset} → ${c.green}${notifier.update.latest}${c.reset}\nRun ${c.cyan}npx wtv update${c.reset} to get the latest version`,
+            message: `Update available ${c.dim}${notifier.update.current}${c.reset} → ${c.green}${notifier.update.latest}${c.reset}\nRun ${c.cyan}npx writethevision update${c.reset} to get the latest version`,
             defer: false,
             boxenOpts: {
                 padding: 1,
@@ -1755,7 +1762,7 @@ async function meetTheTeam() {
 
   First, define your vision:
 
-    ${c.cyan}npx wtv init${c.reset}            Creates VISION.md in your project
+    ${c.cyan}npx writethevision init${c.reset}            Creates VISION.md in your project
 
   ${c.dim}"But let every man take heed how he buildeth thereupon."${c.reset}
   ${c.dim}                                    — 1 Corinthians 3:10 (KJV PCE)${c.reset}
@@ -3056,11 +3063,12 @@ Prototype
 async function interactiveVision() {
     console.clear();
     console.log(`  ${c.magenta}${c.bold}
-   __      ___     _             
-   \\ \\    / (_)___(_)___  _ __   
-    \\ \\/\\/ /| / __| / _ \\| '_ \\  
-     \\_/\\_/ |_|___|_|___/|_| |_| 
-    ${c.reset}`);
+    V   V  IIIII  SSSSS  IIIII  OOOOO  N   N
+    V   V    I    S        I    O   O  NN  N
+    V   V    I    SSSSS    I    O   O  N N N
+     V V     I        S    I    O   O  N  NN
+      V    IIIII  SSSSS  IIIII  OOOOO  N   N
+     ${c.reset}`);
     console.log(`  ${c.dim}Write the vision, make it plain.${c.reset}\n`);
 
     const visionDirPath = join(process.cwd(), 'vision');

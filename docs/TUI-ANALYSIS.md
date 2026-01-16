@@ -347,7 +347,7 @@ This would let users share themes between tools.
 
 1. **Verify OpenCode compatibility**
    ```bash
-   npx wtv init --opencode
+   npx writethevision init --opencode
    # Then test in OpenCode
    ```
 

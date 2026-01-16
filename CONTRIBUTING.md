@@ -16,7 +16,7 @@ git push origin main
 
 ### Publishing to npm
 
-npm and GitHub are **separate**. After pushing to GitHub, you must also publish to npm for `npx wtv` to get the updates.
+npm and GitHub are **separate**. After pushing to GitHub, you must also publish to npm for `npx writethevision` to get the updates.
 
 ```bash
 # 1. Bump the version (choose one)
@@ -64,7 +64,7 @@ cd /path/to/wtv
 npm link
 
 cd /path/to/test-project
-npx wtv init
+npx writethevision init
 ```
 
 ## Project Structure
