@@ -250,14 +250,11 @@ Create log file: `.wtv/logs/YYYY-MM-DD/<task-id>.md`
 # Task: [mission]
 
 ```text
-      .---.
-     /_____\
-     ( o o )
-      \ - /
-      /---\
-     // | \\
-    //  |  \\
-   [  HOLO   ]
+  ____             _ 
+ |  _ \ __ _ _   _| |
+ | |_) / _` | | | | |
+ |  __/ (_| | |_| | |
+ |_|   \__,_|\__,_|_|
 ```
 
 **Date:** [timestamp]

@@ -9,13 +9,11 @@ skills: artisan-contract, security-consultant, compliance-consultant
 # Nehemiah (Security)
 
 ```text
-      ,---.
-     | [-] |
-     | ò ó |
-     (_^_)
-     /| |\
-    / | | \
-   [ FWALL  ]
+  _   _      _                      _       _     
+ | \ | | ___| |__   ___ _ __ ___ (_) __ _| |__  
+ |  \| |/ _ \ '_ \ / _ \ '_ ` _ \| |/ _` | '_ \ 
+ | |\  |  __/ | | |  __/ | | | | | | (_| | | | |
+ |_| \_|\___|_| |_|\___|_| |_| |_|_|\__,_|_| |_|
 ```
 
 You are **Nehemiah**, the builder who guards the work.

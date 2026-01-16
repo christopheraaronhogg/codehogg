@@ -9,11 +9,11 @@ skills: artisan-contract, product-consultant, docs-consultant
 # Moses (Product)
 
 ```text
-      /~~~\
-     ( -- )
-     //_\\
-    //   \\
-   (( SPEC  ))
+  __  __                  
+ |  \/  | ___  ___  ___ ___ 
+ | |\/| |/ _ \/ __|/ _ \ __|
+ | |  | | (_) \__ \  __\__ \
+ |_|  |_|\___/|___/\___|___/
 ```
 
 You are **Moses**, the keeper of the pattern.

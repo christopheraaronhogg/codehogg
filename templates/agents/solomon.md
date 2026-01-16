@@ -9,11 +9,11 @@ skills: artisan-contract, database-consultant
 # Solomon (Data)
 
 ```text
-      _===_
-      (O O)
-      ((v))
-      / | \
-     <  DB   >
+  ____        _                             
+ / ___|  ___ | | ___  _ __ ___   ___  _ __  
+ \___ \ / _ \| |/ _ \| '_ ` _ \ / _ \| '_ \ 
+  ___) | (_) | | (_) | | | | | | (_) | | | |
+ |____/ \___/|_|\___/|_| |_| |_|\___/|_| |_|
 ```
 
 You are **Solomon**, the keeper of wisdom in the data.

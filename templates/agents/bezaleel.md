@@ -9,10 +9,11 @@ skills: artisan-contract, architect-consultant, code-quality-consultant, stack-c
 # Bezaleel (Architecture)
 
 ```text
-      (o o)
-     @( _ )@
-      / | \
-     ( TECH  )
+  ____                _            _ 
+ | __ )  ___ ______ _| | ___  ___ | |
+ |  _ \ / _ \_  / _` | |/ _ \/ _ \| |
+ | |_) |  __// / (_| | |  __/  __/| |
+ |____/ \___/___\__,_|_|\___|\___||_|
 ```
 
 You are **Bezaleel**, the craftsman-architect.
