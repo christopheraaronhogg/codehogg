@@ -3063,11 +3063,12 @@ Prototype
 async function interactiveVision() {
     console.clear();
     console.log(`  ${c.magenta}${c.bold}
-    V   V  IIIII  SSSSS  IIIII  OOOOO  N   N
-    V   V    I    S        I    O   O  NN  N
-    V   V    I    SSSSS    I    O   O  N N N
-     V V     I        S    I    O   O  N  NN
-      V    IIIII  SSSSS  IIIII  OOOOO  N   N
+██╗   ██╗██╗███████╗██╗ ██████╗ ███╗   ██╗
+██║   ██║██║██╔════╝██║██╔═══██╗████╗  ██║
+██║   ██║██║███████╗██║██║   ██║██╔██╗ ██║
+╚██╗ ██╔╝██║╚════██║██║██║   ██║██║╚██╗██║
+ ╚████╔╝ ██║███████║██║╚██████╔╝██║ ╚████║
+  ╚═══╝  ╚═╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝
      ${c.reset}`);
     console.log(`  ${c.dim}Write the vision, make it plain.${c.reset}\n`);
 
