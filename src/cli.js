@@ -13,7 +13,30 @@ import {
     writeFileSync,
 } from 'fs';
 import { homedir, platform } from 'os';
-import { spawn } from 'child_process';
+const { spawn } = require('child_process');
+
+async function openInEditor(filePath) {
+    const editor = process.env.EDITOR || 'vi';
+
+    // Safety check for raw mode
+    const wasRaw = process.stdin.isRaw;
+    if (wasRaw) process.stdin.setRawMode(false);
+
+    const child = spawn(editor, [filePath], {
+        stdio: 'inherit'
+    });
+
+    await new Promise((resolve) => {
+        child.on('exit', () => {
+            if (wasRaw) {
+                process.stdin.setRawMode(true);
+                process.stdin.resume();
+            }
+            resolve();
+        });
+    });
+}
+
 import readline, { createInterface, emitKeypressEvents } from 'readline';
 import updateNotifier from 'update-notifier';
 
@@ -22,7 +45,7 @@ const __dirname = dirname(__filename);
 const PACKAGE_ROOT = resolve(__dirname, '..');
 const TEMPLATES_DIR = join(PACKAGE_ROOT, 'templates');
 
-const TOOL_IDS = ['claude', 'codex', 'opencode'];
+const TOOL_IDS = ['claude', 'codex', 'opencode', 'gemini', 'antigravity'];
 const VISION_TEMPLATE_PATH = join(TEMPLATES_DIR, 'VISION_TEMPLATE.md');
 const WTV_LOGS_DIR = '.wtv/logs';
 const LEGACY_LOGS_DIR = '.codehogg/logs';
@@ -315,6 +338,21 @@ function getAgentLocations() {
         tool: 'opencode',
         scope: 'local',
     });
+    locations.push({
+        label: 'Local (Gemini)',
+        path: join(process.cwd(), '.gemini', 'agents'),
+        tool: 'gemini',
+        scope: 'local',
+    });
+    // Antigravity does not use "agent definition files" locally like Claude/OpenCode.
+    // However, for visualization, we might want to check for something, or just rely on rules.
+    // For now, we will track .agent/rules/ as a proxy for "local configuration".
+    locations.push({
+        label: 'Local (Antigravity Rules)',
+        path: join(process.cwd(), '.agent', 'rules'),
+        tool: 'antigravity',
+        scope: 'local',
+    });
 
     // Global
     if (home) {
@@ -328,6 +366,19 @@ function getAgentLocations() {
             label: 'Global (OpenCode)',
             path: join(home, '.config', 'opencode', 'agent'),
             tool: 'opencode',
+            scope: 'global',
+        });
+        locations.push({
+            label: 'Global (Gemini)',
+            path: join(home, '.gemini', 'agents'),
+            tool: 'gemini',
+            scope: 'global',
+        });
+        // Antigravity global
+        locations.push({
+            label: 'Global (Antigravity)',
+            path: join(home, '.gemini', 'antigravity'),
+            tool: 'antigravity',
             scope: 'global',
         });
     }
@@ -1280,7 +1331,7 @@ function printBanner() {
     console.log(drawBox([
         `  ${c.bold}${c.magenta}wtv${c.reset} ${c.dim}v${version}${c.reset}`,
         `  ${c.dim}10 agents ${sym.bullet} 21 skills${c.reset}`,
-        `  ${c.dim}Claude Code ${sym.bullet} Codex CLI ${sym.bullet} OpenCode${c.reset}`,
+        `  ${c.dim}Claude • Codex • OpenCode • Gemini • Antigravity${c.reset}`,
     ], { style: 'round', color: c.magenta, padding: 0 }));
     console.log('');
 }
@@ -1702,6 +1753,13 @@ function getRootDirForTool(tool, scope, customPath = null) {
             return scope === 'global' ? join(home, '.claude') : join(process.cwd(), '.claude');
         case 'codex':
             return scope === 'global' ? join(home, '.codex') : join(process.cwd(), '.codex');
+        case 'gemini':
+            return scope === 'global' ? join(home, '.gemini') : join(process.cwd(), '.gemini');
+        case 'antigravity':
+            if (scope === 'global') {
+                return join(home, '.gemini', 'antigravity');
+            }
+            return join(process.cwd(), '.agent');
         default:
             return null;
     }
@@ -1847,7 +1905,7 @@ function installSkills(destDir, { force, showProgress, label }) {
     return skillDirs.length;
 }
 
-function installClaude(targetDir, { force, showProgress, selectedArtisans = null }) {
+function installStandardTool(toolName, targetDir, { force, showProgress, selectedArtisans = null }) {
     const validation = validatePath(targetDir);
     if (!validation.valid) {
         throw new Error(validation.error);
@@ -1905,7 +1963,7 @@ function installClaude(targetDir, { force, showProgress, selectedArtisans = null
     }
 
     const skillsDest = join(targetDir, 'skills');
-    installSkills(skillsDest, { force, showProgress, label: 'Claude skills' });
+    installSkills(skillsDest, { force, showProgress, label: `${toolName} skills` });
 
     const wtvSrc = join(TEMPLATES_DIR, 'WTV.md');
     const wtvDest = join(targetDir, 'WTV.md');
@@ -1923,7 +1981,55 @@ function installClaude(targetDir, { force, showProgress, selectedArtisans = null
     writeTimestamp(targetDir);
 
     if (showProgress) {
-        console.log(`    ${c.green}${sym.check}${c.reset} ${agentCount} Claude agents`);
+        console.log(`    ${c.green}${sym.check}${c.reset} ${agentCount} ${toolName} agents`);
+    }
+
+    return true;
+}
+
+function installClaude(targetDir, options) {
+    return installStandardTool('Claude', targetDir, options);
+}
+
+function installGemini(targetDir, options) {
+    return installStandardTool('Gemini', targetDir, options);
+}
+
+function installAntigravity(targetDir, options) {
+    const success = installStandardTool('Antigravity', targetDir, options);
+    if (!success) return false;
+
+    // Create Antigravity Rule file to bootstrap agents and AGENTS.md
+    const rulesDir = join(targetDir, 'rules');
+    ensureDir(rulesDir);
+    const rulePath = join(rulesDir, 'wtv-bootstrap.md');
+
+    if (!existsSync(rulePath) || options.force) {
+        const ruleContent = `# WTV Configuration
+
+This workspace uses the WTV agent system.
+
+## Core Instructions
+1. **Source of Truth**: Always read and adhere to \`./AGENTS.md\` in the repository root.
+   - If \`./AGENTS.override.md\` exists in a subdirectory, it takes precedence for that directory.
+
+## Expert Agents
+The following expert agents are available in \`.agent/agents/\`. When acting as or consulting them, read their definition file:
+- **Paul** (Masterbuilder): \`.agent/agents/paul.md\`
+- **Nehemiah** (Security): \`.agent/agents/nehemiah.md\`
+- **Bezaleel** (Architecture): \`.agent/agents/bezaleel.md\`
+- **Hiram** (Backend): \`.agent/agents/hiram.md\`
+- **Aholiab** (Frontend): \`.agent/agents/aholiab.md\`
+- **Solomon** (Data): \`.agent/agents/solomon.md\`
+- **Zerubbabel** (DevOps): \`.agent/agents/zerubbabel.md\`
+- **Ezra** (QA): \`.agent/agents/ezra.md\`
+- **Moses** (Product): \`.agent/agents/moses.md\`
+- **David** (Voice): \`.agent/agents/david.md\`
+`;
+        writeFileSync(rulePath, ruleContent);
+        if (options.showProgress) {
+            console.log(`    ${c.green}${sym.check}${c.reset} Antigravity bootstrap rule created`);
+        }
     }
 
     return true;
@@ -2109,11 +2215,15 @@ async function interactiveInit() {
     const installClaudeFlag = await confirm('Install for Claude Code?', true);
     const installCodexFlag = await confirm('Install for Codex CLI?', false);
     const installOpenCodeFlag = await confirm('Install for OpenCode?', false);
+    const installGeminiFlag = await confirm('Install for Gemini Type? (Gemini CLI)', false);
+    const installAntigravityFlag = await confirm('Install for Antigravity?', false);
 
     const tools = [];
     if (installClaudeFlag) tools.push('claude');
     if (installCodexFlag) tools.push('codex');
     if (installOpenCodeFlag) tools.push('opencode');
+    if (installGeminiFlag) tools.push('gemini');
+    if (installAntigravityFlag) tools.push('antigravity');
 
     if (tools.length === 0) {
         console.log(`\n  ${c.dim}No tools selected. Nothing to do.${c.reset}\n`);
@@ -2211,6 +2321,18 @@ function doInstall({ scope, tools, force, showProgress, customPath, selectedArti
                 throw new Error('Custom --path is not supported for OpenCode installs.');
             }
             installOpenCode(scope, { force, showProgress, selectedArtisans });
+        }
+
+        if (tool === 'gemini') {
+            const targetDir = getRootDirForTool('gemini', scope, customPath);
+            if (!targetDir) throw new Error('Cannot determine .gemini directory.');
+            installGemini(targetDir, { force, showProgress, selectedArtisans });
+        }
+
+        if (tool === 'antigravity') {
+            const targetDir = getRootDirForTool('antigravity', scope, customPath);
+            if (!targetDir) throw new Error('Cannot determine .antigravity directory.');
+            installAntigravity(targetDir, { force, showProgress, selectedArtisans });
         }
     }
 
@@ -2715,7 +2837,17 @@ function getVisionPath(scope) {
         const home = getHomedir();
         return home ? join(home, 'VISION.md') : null;
     }
-    return join(process.cwd(), 'VISION.md');
+
+    // Project scope: Prefer vision/VISION.md
+    const hasVisionDir = existsSync(join(process.cwd(), 'vision'));
+    const visionDirFile = join(process.cwd(), 'vision', 'VISION.md');
+    const rootFile = join(process.cwd(), 'VISION.md');
+
+    if (existsSync(visionDirFile)) return visionDirFile;
+    if (existsSync(rootFile)) return rootFile;
+
+    // Default for new files: vision/VISION.md
+    return visionDirFile;
 }
 
 function parseVisionSections(content) {
@@ -2768,58 +2900,222 @@ async function initVision(scope) {
         }
     }
 
-    console.log(`\n  ${c.bold}Create VISION.md${c.reset}`);
-    console.log(`  ${c.dim}All questions are optional. Press Enter to skip.${c.reset}\n`);
+    console.log(`\n  ${c.magenta}${c.bold}Write the Vision${c.reset}\n`);
+    console.log(`  ${c.dim}> "And the LORD answered me, and said, Write the vision,${c.reset}`);
+    console.log(`  ${c.dim}>  and make [it] plain upon tables, that he may run that readeth it."${c.reset}`);
+    console.log(`  ${c.dim}>  — Habakkuk 2:2 (KJV PCE)${c.reset}\n`);
 
-    const purpose = await prompt(`  ${c.cyan}Purpose${c.reset} (Who is this for and what does it do?):\n  > `);
-    const outcomes = await prompt(`  ${c.cyan}Outcomes${c.reset} (What does success look like?):\n  > `);
-    const values = await prompt(`  ${c.cyan}Values${c.reset} (What matters most? Tradeoffs?):\n  > `);
-    const constraints = await prompt(`  ${c.cyan}Constraints${c.reset} (Off-limits? Time, budget, compliance?):\n  > `);
+    // Create template
+    const template = `${c.dim}# Vision
 
-    const stageChoice = await select('Current stage?', [
-        { value: 'Prototype', label: 'Prototype', desc: 'Exploring ideas, nothing production-ready' },
-        { value: 'MVP', label: 'MVP', desc: 'Core functionality, shipping to early users' },
-        { value: 'Production', label: 'Production', desc: 'Live product, real users, stability matters' },
-        { value: 'Maintenance', label: 'Maintenance', desc: 'Stable product, bug fixes and minor features' },
-        { value: '', label: 'Skip', desc: 'Leave unspecified' },
-    ]);
-
-    const focus = await prompt(`  ${c.cyan}Current Focus${c.reset} (What's the one thing right now?):\n  > `);
-
-    // Build VISION.md content
-    let content = `# Vision
-
-> "And the LORD answered me, and said, Write the vision, and make it plain upon tables, that he may run that readeth it."
-> — Habakkuk 2:2 (KJV)
-
+<!-- Who is this for and what does it do? -->
 ## Purpose
-${purpose || '<!-- Who is this for and what does it do? -->'}
+Project Purpose...
 
+<!-- What does success look like? -->
 ## Outcomes
-${outcomes || '<!-- What does success look like? Be concrete. -->'}
+- Success Metric 1
+- Success Metric 2
 
+<!-- What matters most? Tradeoffs? -->
 ## Values
-${values || '<!-- What matters most? What tradeoffs are acceptable? -->'}
+- Value 1
+- Value 2
 
+<!-- Off-limits? Time, budget, compliance? -->
 ## Constraints
-${constraints || '<!-- What\'s off-limits? Time, budget, compliance, dependencies? -->'}
+- Constraint 1
 
+<!-- Prototype / MVP / Production / Maintenance -->
 ## Stage
-${stageChoice || '<!-- Where are we? Prototype / MVP / Production / Maintenance -->'}
+Prototype
 
+<!-- What's the one thing right now? -->
 ## Current Focus
-${focus || '<!-- What\'s the one thing right now? -->'}
+One Thing
+${c.reset}`;
+
+    // Clean Markdown for file (no colors)
+    const cleanTemplate = `# Vision
+
+<!-- Who is this for and what does it do? -->
+## Purpose
+<!-- Summarize the "Why". Who is it for? what problem does it solve? -->
+
+
+<!-- What does success look like? -->
+## Outcomes
+<!-- Specific, measurable results -->
+- 
+
+<!-- What matters most? Tradeoffs? -->
+## Values
+<!-- e.g. Speed over Features, Privacy over Convenience -->
+- 
+
+<!-- Off-limits? Time, budget, compliance? -->
+## Constraints
+<!-- Hard stops and boundaries -->
+- 
+
+<!-- Prototype / MVP / Production / Maintenance -->
+## Stage
+Prototype
+
+<!-- What's the one thing right now? -->
+## Current Focus
+<!-- The single most important next step -->
 `;
 
-    writeFileSync(visionPath, content);
-    console.log(`\n  ${c.green}${sym.check}${c.reset} Created VISION.md at: ${visionPath}\n`);
+    ensureDir(dirname(visionPath));
+    writeFileSync(visionPath, cleanTemplate);
 
+    console.log(`  ${c.bold}Opening editor...${c.reset}`);
+    console.log(`  ${c.dim}(Close editor to save)${c.reset}\n`);
+
+    await openInEditor(visionPath);
+
+    console.log(`\n  ${c.green}${sym.check}${c.reset} Vision saved at: ${visionPath}\n`);
     return true;
 }
 
 // ============================================================================
 // DASHBOARD (Agent Command Center)
 // ============================================================================
+
+async function interactiveVision() {
+    console.clear();
+    console.log(`  ${c.magenta}${c.bold}
+   __      ___     _             
+   \\ \\    / (_)___(_)___  _ __   
+    \\ \\/\\/ /| / __| / _ \\| '_ \\  
+     \\_/\\_/ |_|___|_|___/|_| |_| 
+    ${c.reset}`);
+    console.log(`  ${c.dim}Write the vision, make it plain.${c.reset}\n`);
+
+    const visionDirPath = join(process.cwd(), 'vision');
+    const rootVisionPath = join(process.cwd(), 'VISION.md');
+
+    // Build file list
+    const files = [];
+    if (existsSync(rootVisionPath)) {
+        files.push({
+            path: rootVisionPath,
+            label: 'VISION.md (Root)',
+            type: 'root'
+        });
+    }
+
+    if (existsSync(visionDirPath) && lstatSync(visionDirPath).isDirectory()) {
+        const vFiles = readdirSync(visionDirPath)
+            .filter(f => f.endsWith('.md'))
+            .map(f => ({
+                path: join(visionDirPath, f),
+                label: `vision/${f}`,
+                type: 'vision'
+            }));
+        files.push(...vFiles);
+    }
+
+    // Actions
+    const choices = [];
+
+    if (files.length === 0) {
+        console.log(`  ${c.yellow}No vision documents found.${c.reset}\n`);
+        console.log(`  ${c.dim}> "Write the vision, and make [it] plain upon tables,${c.reset}`);
+        console.log(`  ${c.dim}>  that he may run that readeth it."${c.reset}`);
+        console.log(`  ${c.dim}>  — Habakkuk 2:2 (KJV PCE)${c.reset}\n`);
+        console.log(`  ${c.bold}Start by defining the core vision for this project.${c.reset}\n`);
+        choices.push({ value: 'create_root', label: 'Create Project Vision (VISION.md)', desc: 'The main vision for the project' });
+    } else {
+        console.log(`  ${c.bold}Existing Documents:${c.reset}`);
+        files.forEach(f => console.log(`  - ${f.label}`));
+        console.log('');
+
+        choices.push({ value: 'view', label: 'Read / Edit Existing Vision', desc: 'View or modify a vision document' });
+        choices.push({ value: 'create_sub', label: 'Add New Vision Document', desc: 'Create a new strategy/roadmap file in vision/' });
+    }
+
+    choices.push({ value: 'exit', label: 'Return to Dashboard' });
+
+    const action = await select('Action:', choices);
+
+    if (action === 'exit') return;
+
+    if (action === 'create_root') {
+        await initVision('project');
+        await interactiveVision(); // Loop back
+        return;
+    }
+
+    if (action === 'create_sub') {
+        const name = await prompt(`  ${c.cyan}Filename${c.reset} (e.g. roadmap, values):\n  > `);
+        if (!name) return interactiveVision();
+
+        const filename = name.endsWith('.md') ? name : `${name}.md`;
+        const filepath = join(visionDirPath, filename);
+
+        ensureDir(visionDirPath);
+
+        if (existsSync(filepath)) {
+            console.log(`  ${c.yellow}File already exists.${c.reset}`);
+            // Fall through to edit logic? Or just loop.
+            await new Promise(r => setTimeout(r, 1000));
+            return interactiveVision();
+        }
+
+        // Use a simpler prompt flow for sub-visions
+        console.log(`\n  ${c.bold}Opening editor for ${filename}...${c.reset}`);
+
+        const content = `# ${name.replace('.md', '')}\n\n<!-- Vision support document. Describe your thoughts here... -->\n`;
+
+        writeFileSync(filepath, content);
+        await openInEditor(filepath);
+
+        console.log(`\n  ${c.green}${sym.check}${c.reset} Created vision/${filename}`);
+        await new Promise(r => setTimeout(r, 1000));
+        return interactiveVision();
+    }
+
+    if (action === 'view') {
+        const fileChoices = files.map(f => ({ value: f.path, label: f.label }));
+        const targetPath = await select('Select document:', fileChoices);
+
+        if (targetPath) {
+            // Read and show content
+            const content = readFileSync(targetPath, 'utf8');
+            console.clear();
+            console.log(`  ${c.bold}Reading: ${basename(targetPath)}${c.reset}\n`);
+            console.log(content);
+            console.log('\n  ' + '-'.repeat(40) + '\n');
+
+            const subAction = await select('Options:', [
+                { value: 'back', label: 'Back to Vision Board' },
+                { value: 'edit', label: 'Edit File', desc: `Open in ${process.env.EDITOR || 'default editor'}` }
+            ]);
+
+            if (subAction === 'edit') {
+                const editor = process.env.EDITOR || 'vi'; // Default to vi if unset
+                // Clean up tty before spawning
+                process.stdin.setRawMode(false);
+
+                const child = spawn(editor, [targetPath], {
+                    stdio: 'inherit'
+                });
+
+                await new Promise((resolve) => {
+                    child.on('exit', () => {
+                        resolve();
+                    });
+                });
+
+                // Restore raw mode if needed by caller (dashboard mostly)
+                // But interactiveVision will loop and clear screen anyway
+            }
+        }
+        return interactiveVision();
+    }
+}
 
 async function dashboard() {
     // Check if we can run interactive mode
@@ -2836,7 +3132,7 @@ async function dashboard() {
         { label: 'EXIT', action: 'exit' }
     ];
 
-    let selectedIndex = 0;
+    let selectedIndex = 1; // Default to VISION BOARD
 
     function render() {
         // Clear screen
@@ -2903,22 +3199,9 @@ async function dashboard() {
                     await dashboard();
                     resolve();
                 } else if (action === 'vision') {
-                    // Just open/print vision for now
-                    console.clear();
-                    const visionPath = getVisionPath('project');
-                    if (visionPath && existsSync(visionPath)) {
-                        console.log(readFileSync(visionPath, 'utf8'));
-                    } else {
-                        console.log('No VISION.md found.');
-                    }
-                    console.log('\nPress any key to return...');
-                    process.stdin.setRawMode(true);
-                    process.stdin.resume();
-                    process.stdin.once('data', async () => {
-                        process.stdin.setRawMode(false);
-                        await dashboard();
-                        resolve();
-                    });
+                    await interactiveVision();
+                    await dashboard(); // Re-render dashboard after return
+                    resolve();
                 }
             } else if (key.name === 'q' || key.name === 'escape') {
                 process.stdin.setRawMode(false);
@@ -3696,11 +3979,13 @@ function showHelp() {
     console.log(`${pad}  ${c.dim}--global, -g${c.reset}      Global scope`);
     console.log(`${pad}  ${c.dim}--local, -l${c.reset}       Project scope (default)`);
     console.log(`${pad}  ${c.dim}--force, -f${c.reset}       Overwrite existing`);
-    console.log(`${pad}  ${c.dim}--tool <tool>${c.reset}     Tool: claude | codex | opencode`);
+    console.log(`${pad}  ${c.dim}--tool <tool>${c.reset}     Tool: claude | codex | opencode | gemini | antigravity`);
     console.log(`${pad}  ${c.dim}--path <dir>${c.reset}      Install/check a custom directory`);
     console.log(`${pad}  ${c.dim}--claude${c.reset}          Target Claude Code`);
     console.log(`${pad}  ${c.dim}--codex${c.reset}           Target Codex CLI`);
-    console.log(`${pad}  ${c.dim}--opencode${c.reset}         Target OpenCode\n`);
+    console.log(`${pad}  ${c.dim}--opencode${c.reset}         Target OpenCode`);
+    console.log(`${pad}  ${c.dim}--gemini${c.reset}           Target Gemini CLI`);
+    console.log(`${pad}  ${c.dim}--antigravity${c.reset}      Target Antigravity\n`);
 
     console.log(`${pad}${c.bold}Examples${c.reset}`);
     console.log(`${pad}  ${c.green}wtv${c.reset}                          ${c.dim}# Dashboard${c.reset}`);
@@ -3795,6 +4080,16 @@ function parseArgs(args) {
 
         if (a === '--opencode') {
             opts.tools.push('opencode');
+            continue;
+        }
+
+        if (a === '--gemini') {
+            opts.tools.push('gemini');
+            continue;
+        }
+
+        if (a === '--antigravity') {
+            opts.tools.push('antigravity');
             continue;
         }
 

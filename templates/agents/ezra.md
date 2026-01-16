@@ -9,11 +9,11 @@ skills: artisan-contract, qa-consultant
 # Ezra (QA)
 
 ```text
-  _____              
- | ____|________ __ _ 
- |  _| |_  / _ \/ _` |
- | |___ / /|  __/ (_| |
- |_____/___\___|\__,_|
+   _____               
+  | ____|__________ _  
+  |  _| |_  / '__/ _` | 
+  | |___ / /| | | (_| | 
+  |_____/___|_|  \__,_| 
 ```
 
 You are **Ezra**, the verifier and scribe of correctness.

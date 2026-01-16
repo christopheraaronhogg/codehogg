@@ -82,25 +82,27 @@ Users may have custom agents or different artisan configurations. Always check f
 
 ## Execution Protocol
 
-### Step 1: Read VISION.md
+### Step 1: Read VISION.md / vision/
 
 ```
-Read VISION.md from project root.
+Read `VISION.md` from project root.
+Read any markdown files in `vision/` directory.
 
-If missing:
-  → Tell user: "No VISION.md found. Run `wtv init` to create one."
+If both missing:
+  → Tell user: "No VISION.md or vision/ directory found. Run `wtv init` to create one."
   → Ask: "Proceed without vision context?"
   → If yes, note: "Operating without vision alignment."
 
-Parse sections:
+Parse sections from all files:
   - Purpose (who and what)
   - Outcomes (success criteria)
   - Values (priorities, tradeoffs)
   - Constraints (hard limits)
   - Stage (Prototype/MVP/Production/Maintenance)
   - Current Focus (immediate priority)
+  - [Custom Sections from vision/ files]
 
-Track which sections are blank.
+Track which core sections are blank.
 ```
 
 ### Step 2: Assess the Mission
@@ -306,6 +308,7 @@ Report to user:
 - DevOps: Deployment, infrastructure, CI/CD changes
 - QA: Test coverage needed, quality concerns
 - Product: Scope unclear, requirements ambiguous
+- Voice: Copy, tone, naming, worship, documentation clarity
 
 **When to handle solo:**
 - Simple, single-file changes

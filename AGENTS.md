@@ -37,7 +37,8 @@ The AI tools do the actual work. wtv just manages what's installed.
 | **Claude Code** | `.claude/agents/` | `.claude/skills/` |
 | **OpenCode** | `.opencode/agent/` | `.claude/skills/` (shared) |
 | **Codex CLI** | (no agents) | `.codex/skills/` |
-| **Gemini CLI** | (TBD) | (TBD) |
+| **Gemini CLI** | `.gemini/agents/` | `.gemini/skills/` |
+| **Antigravity** | `.agent/rules/` | `.agent/skills/` |
 
 ## What Gets Installed
 

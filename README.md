@@ -25,14 +25,14 @@ WTV installs a Biblical “team” (Paul + artisans) into your AI coding tools (
                               │
                     installs into
                               │
-     ┌────────────┬───────────┼───────────┬────────────┐
-     ▼            ▼           ▼           ▼            ▼
-┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
-│ Claude  │ │ OpenCode│ │  Codex  │ │ Gemini  │ │  Future │
-│  Code   │ │         │ │   CLI   │ │   CLI   │ │  Tools  │
-└─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘
-     │            │           │           │            │
-     └────────────┴───────────┴───────────┴────────────┘
+     ┌────────────┬───────────┼───────────┬────────────┬─────────────┐
+     ▼            ▼           ▼           ▼            ▼             ▼
+┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌──────────────┐
+│ Claude  │ │ OpenCode│ │  Codex  │ │ Gemini  │ │ Antigravity  │
+│  Code   │ │         │ │   CLI   │ │   CLI   │ │ (Agent Rule) │
+└─────────┘ └─────────┘ └─────────┘ └─────────┘ └──────────────┘
+     │            │           │           │             │
+     └────────────┴───────────┴───────────┴─────────────┘
                               │
                      AI executes here
               (Native Task tool spawns agents,
@@ -41,7 +41,7 @@ WTV installs a Biblical “team” (Paul + artisans) into your AI coding tools (
 
 **The flow:**
 1. `wtv init` installs agents/skills into tool-specific folders
-2. You work in Claude Code, OpenCode, Codex, or Gemini CLI
+2. You work in Claude Code, OpenCode, Codex, Gemini CLI, or Antigravity
 3. The AI loads skills as context and spawns agents via native Task tools
 4. wtv CLI helps you see and manage what's installed
 
@@ -85,6 +85,12 @@ npx wtv init --opencode --global
 # Codex CLI (skills only)
 npx wtv init --codex
 npx wtv init --codex --global
+
+# Gemini CLI (agents + skills)
+npx wtv init --gemini
+
+# Antigravity (skills + rule)
+npx wtv init --antigravity
 ```
 
 ### Updates
@@ -139,17 +145,37 @@ Skills contain evaluation frameworks, checklists, and report templates.
 # Codex CLI
 .codex/
 └── skills/      # Skill definitions (no agents)
+
+# Gemini CLI
+.gemini/
+├── agents/
+└── skills/
+
+# Antigravity
+.agent/
+├── rules/       # wtv-bootstrap.md (directs to AGENTS.md + agents/)
+├── agents/      # Agent definitions
+└── skills/      # Skill definitions
 ```
 
 ## Vision-Driven Development
 
 ### VISION.md
 
-Create a vision file that agents align to:
+Create a vision file that agents align to. You can use a single `VISION.md` in the root, or organize multiple vision documents in a `vision/` directory.
 
 ```bash
 npx wtv init   # Wizard helps you define it
 ```
+
+### Directory Structure (Optional)
+For complex projects, use a `vision/` folder:
+- `vision/VISION.md` (Primary)
+- `vision/roadmap.md`
+- `vision/ideas.md`
+- `vision/values.md`
+
+Paul and the artisans will read **all markdown files** in the `vision/` directory to understand the full context.
 
 Sections:
 - **Purpose** — Who is this for and what does it do?
@@ -303,6 +329,8 @@ wtv init                 # Interactive install
 wtv init --claude        # Claude Code
 wtv init --opencode      # OpenCode
 wtv init --codex         # Codex CLI
+wtv init --gemini        # Gemini CLI
+wtv init --antigravity   # Antigravity
 wtv update               # Update installations
 wtv status               # Show what's installed
 
