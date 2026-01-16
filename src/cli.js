@@ -2036,20 +2036,8 @@ The following expert agents are available in \`.agent/agents/\`. When acting as 
     return true;
 }
 
-function installCodex(targetDir, { force, showProgress }) {
-    const validation = validatePath(targetDir);
-    if (!validation.valid) {
-        throw new Error(validation.error);
-    }
-
-    ensureDir(targetDir);
-
-    const skillsDest = join(targetDir, 'skills');
-    installSkills(skillsDest, { force, showProgress, label: 'Codex skills' });
-
-    writeTimestamp(targetDir);
-
-    return true;
+function installCodex(targetDir, options) {
+    return installStandardTool('Codex', targetDir, options);
 }
 
 function installOpenCodeAgents(agentDir, { force, showProgress, selectedArtisans = null }) {
