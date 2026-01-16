@@ -402,6 +402,15 @@ function getAgentLocations() {
     return locations;
 }
 
+function brickifyAsciiArt(asciiArt) {
+    if (!asciiArt) return asciiArt;
+
+    return asciiArt
+        .split('\n')
+        .map(line => line.replace(/[^\s]/g, '█'))
+        .join('\n');
+}
+
 function parseAgentFile(filePath) {
     if (!existsSync(filePath)) return null;
 
@@ -444,7 +453,7 @@ function parseAgentFile(filePath) {
         let asciiArt = '';
         const asciiMatch = content.match(/```text\n([\s\S]+?)\n```/);
         if (asciiMatch) {
-            asciiArt = asciiMatch[1];
+            asciiArt = brickifyAsciiArt(asciiMatch[1]);
         }
 
         return {
@@ -3205,12 +3214,14 @@ async function dashboard() {
 
         // Header
         console.log(
-            `  ${c.magenta}
-  __      ___       
-  \\ \\    / / |_  __ 
-   \\ \\/\\/ /| | \\/ / 
-    \\_/\\_/ \\__|\\/  
-                   ${c.reset}`
+            `  ${c.magenta}${c.bold}
+██╗    ██╗████████╗██╗   ██╗
+██║    ██║╚══██╔══╝██║   ██║
+██║ █╗ ██║   ██║   ██║   ██║
+██║███╗██║   ██║   ╚██╗ ██╔╝
+╚███╔███╔╝   ██║    ╚████╔╝ 
+ ╚══╝╚══╝    ╚═╝     ╚═══╝  
+${c.reset}`
         );
 
         console.log(`  ${c.dim}v${getVersion()} • ${tool.toUpperCase()} MODE${c.reset}\n`);
@@ -3284,11 +3295,12 @@ function dashboardStatic() {
     // Banner
     console.log('');
     const wtvAscii = `
-  ${c.magenta}██     ██ ████████ ██    ██ ${c.reset}
-  ${c.magenta}██     ██    ██    ██    ██ ${c.reset}
-  ${c.magenta}██  █  ██    ██    ██    ██ ${c.reset}
-  ${c.magenta}██ ███ ██    ██     ██  ██  ${c.reset}
-  ${c.magenta} ███ ███     ██      ████   ${c.reset}`;
+  ${c.magenta}${c.bold}██╗    ██╗████████╗██╗   ██╗${c.reset}
+  ${c.magenta}${c.bold}██║    ██║╚══██╔══╝██║   ██║${c.reset}
+  ${c.magenta}${c.bold}██║ █╗ ██║   ██║   ██║   ██║${c.reset}
+  ${c.magenta}${c.bold}██║███╗██║   ██║   ╚██╗ ██╔╝${c.reset}
+  ${c.magenta}${c.bold}╚███╔███╔╝   ██║    ╚████╔╝ ${c.reset}
+  ${c.magenta}${c.bold} ╚══╝╚══╝    ╚═╝     ╚═══╝  ${c.reset}`;
 
     console.log(wtvAscii);
     console.log(drawBox([
