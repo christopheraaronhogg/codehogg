@@ -5,6 +5,7 @@ import {
     constants,
     copyFileSync,
     existsSync,
+    lstatSync,
     mkdirSync,
     readdirSync,
     readFileSync,
@@ -13,7 +14,7 @@ import {
     writeFileSync,
 } from 'fs';
 import { homedir, platform } from 'os';
-const { spawn } = require('child_process');
+import { spawn } from 'child_process';
 
 async function openInEditor(filePath) {
     const editor = process.env.EDITOR || 'vi';
@@ -3095,22 +3096,7 @@ async function interactiveVision() {
             ]);
 
             if (subAction === 'edit') {
-                const editor = process.env.EDITOR || 'vi'; // Default to vi if unset
-                // Clean up tty before spawning
-                process.stdin.setRawMode(false);
-
-                const child = spawn(editor, [targetPath], {
-                    stdio: 'inherit'
-                });
-
-                await new Promise((resolve) => {
-                    child.on('exit', () => {
-                        resolve();
-                    });
-                });
-
-                // Restore raw mode if needed by caller (dashboard mostly)
-                // But interactiveVision will loop and clear screen anyway
+                await openInEditor(targetPath);
             }
         }
         return interactiveVision();
