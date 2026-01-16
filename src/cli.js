@@ -13,6 +13,7 @@ import {
     writeFileSync,
 } from 'fs';
 import { homedir, platform } from 'os';
+import { spawn } from 'child_process';
 import readline, { createInterface, emitKeypressEvents } from 'readline';
 import updateNotifier from 'update-notifier';
 
@@ -2820,13 +2821,131 @@ ${focus || '<!-- What\'s the one thing right now? -->'}
 // DASHBOARD (Agent Command Center)
 // ============================================================================
 
-function dashboard() {
+async function dashboard() {
+    // Check if we can run interactive mode
+    if (!process.stdin.isTTY) {
+        return dashboardStatic();
+    }
+
+    const config = loadConfig();
+    const tool = config.defaultTool || 'claude';
+
+    const menuItems = [
+        { label: 'MANAGE AGENTS', action: 'agents' },
+        { label: 'VISION BOARD', action: 'vision' },
+        { label: 'EXIT', action: 'exit' }
+    ];
+
+    let selectedIndex = 0;
+
+    function render() {
+        // Clear screen
+        process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+        process.stdout.write('\x1b[?25l'); // Hide cursor
+
+        // Header
+        console.log(
+            `  ${c.magenta}
+  __      ___       
+  \\ \\    / / |_  __ 
+   \\ \\/\\/ /| | \\/ / 
+    \\_/\\_/ \\__|\\/  
+                   ${c.reset}`
+        );
+
+        console.log(`  ${c.dim}v${getVersion()} • ${tool.toUpperCase()} MODE${c.reset}\n`);
+
+        // Menu
+        menuItems.forEach((item, idx) => {
+            if (idx === selectedIndex) {
+                console.log(`  ${c.magenta}❯ ${c.bold}${item.label}${c.reset}`);
+            } else {
+                console.log(`    ${c.dim}${item.label}${c.reset}`);
+            }
+        });
+
+        console.log(`\n  ${c.dim}↑/↓: Navigate • Enter: Select${c.reset}`);
+    }
+
+    render();
+
+    // Input loop
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    emitKeypressEvents(process.stdin);
+
+    return new Promise((resolve) => {
+        const handler = async (str, key) => {
+            if (key.ctrl && key.name === 'c') {
+                process.stdin.setRawMode(false);
+                process.stdout.write('\x1b[?25h');
+                process.exit();
+            }
+
+            if (key.name === 'up') {
+                selectedIndex = (selectedIndex - 1 + menuItems.length) % menuItems.length;
+                render();
+            } else if (key.name === 'down') {
+                selectedIndex = (selectedIndex + 1) % menuItems.length;
+                render();
+            } else if (key.name === 'return') {
+                const action = menuItems[selectedIndex].action;
+
+                // Cleanup before action
+                process.stdin.removeListener('keypress', handler);
+                process.stdin.setRawMode(false);
+                process.stdout.write('\x1b[?25h'); // Show cursor
+
+                if (action === 'exit') {
+                    process.exit(0);
+                } else if (action === 'agents') {
+                    await agentsInteractive();
+                    await dashboard();
+                    resolve();
+                } else if (action === 'vision') {
+                    // Just open/print vision for now
+                    console.clear();
+                    const visionPath = getVisionPath('project');
+                    if (visionPath && existsSync(visionPath)) {
+                        console.log(readFileSync(visionPath, 'utf8'));
+                    } else {
+                        console.log('No VISION.md found.');
+                    }
+                    console.log('\nPress any key to return...');
+                    process.stdin.setRawMode(true);
+                    process.stdin.resume();
+                    process.stdin.once('data', async () => {
+                        process.stdin.setRawMode(false);
+                        await dashboard();
+                        resolve();
+                    });
+                }
+            } else if (key.name === 'q' || key.name === 'escape') {
+                process.stdin.setRawMode(false);
+                process.stdout.write('\x1b[?25h');
+                process.exit(0);
+            }
+        };
+
+        process.stdin.on('keypress', handler);
+    });
+}
+
+function dashboardStatic() {
     const pad = centerPad();
 
     // Banner
     console.log('');
+    const wtvAscii = `
+  ${c.magenta}██     ██ ████████ ██    ██ ${c.reset}
+  ${c.magenta}██     ██    ██    ██    ██ ${c.reset}
+  ${c.magenta}██  █  ██    ██    ██    ██ ${c.reset}
+  ${c.magenta}██ ███ ██    ██     ██  ██  ${c.reset}
+  ${c.magenta} ███ ███     ██      ████   ${c.reset}`;
+
+    console.log(wtvAscii);
     console.log(drawBox([
-        `  ${c.bold}${c.magenta}wtv${c.reset} ${c.dim}v${getVersion()}${c.reset}`,
+        `  ${c.dim}v${getVersion()}${c.reset}`,
         `  ${c.dim}By the power of Biblical Artisans${c.reset}`,
         ``,
         `  ${c.green}Run 'wtv meet' to be introduced to the team.${c.reset}`,
@@ -2941,79 +3060,119 @@ function dashboard() {
 // ============================================================================
 
 async function agentsInteractive() {
-    const agents = discoverAgents();
-    if (agents.length === 0) {
-        console.log(`\n  ${c.yellow}${sym.warn}${c.reset} No agents discovered.`);
+    // 1. Gather all potential agents match against scopes
+    const templatesPath = join(TEMPLATES_DIR, 'agents');
+    if (!existsSync(templatesPath)) {
+        console.log(`\n  ${c.red}Error:${c.reset} Templates not found at ${templatesPath}`);
         return;
     }
 
+    const templateFiles = readdirSync(templatesPath).filter(f => f.endsWith('.md'));
+
+    // Sort logic: Favorites first, then alpha
+    const getSortKey = (name, isFav) => (isFav ? '0-' : '1-') + name;
+
+    const locations = getAgentLocations();
+    // Helper to get installed path for a scope
+    const getInstallPath = (scope) => {
+        const loc = locations.find(l => l.scope === scope);
+        return loc ? loc.path : null;
+    };
+
+    const localPath = getInstallPath('local');
+    const globalPath = getInstallPath('global');
+
+    // Build unified agent list
+    let agents = templateFiles.map(file => {
+        const fullPath = join(templatesPath, file);
+        const data = parseAgentFile(fullPath);
+        if (!data) return null;
+
+        const isLocal = localPath && existsSync(join(localPath, file));
+        const isGlobal = globalPath && existsSync(join(globalPath, file));
+
+        return {
+            ...data,
+            fileName: file,
+            // Source of truth
+            isLocal,
+            isGlobal,
+            // Pending state: Default to TRUE (Auto-Select All)
+            wantsLocal: true,
+            wantsGlobal: true
+        };
+    }).filter(a => a !== null);
+
+    // Initial Sort
+    agents.sort((a, b) => getSortKey(a.name, a.favorite).localeCompare(getSortKey(b.name, b.favorite)));
+
     let selectedIndex = 0;
-    let favoritesSnapshot = agents.map(a => a.favorite);
-    let changed = false;
 
-    const rl = createInterface({
-        input: process.stdin,
-        output: process.stdout,
-    });
-
-    emitKeypressEvents(process.stdin);
-    if (process.stdin.isTTY) {
-        process.stdin.setRawMode(true);
-    }
+    // No more sub-menu!
 
     const render = () => {
-        const width = getWidth();
-        const sidebarWidth = 25;
-        const mainWidth = width - sidebarWidth - 5;
-
-        // Clear screen and reset cursor
+        // Clear screen
         process.stdout.write('\x1b[2J\x1b[H');
 
         console.log(`  ${c.bold}${c.magenta}wtv${c.reset} ${c.dim}Agent Manager${c.reset}\n`);
 
+        const sidebarWidth = 35;
         const star = isWindows ? '*' : '★';
-        const empty = isWindows ? '[ ]' : '◌';
-        const checked = isWindows ? '[x]' : '●';
 
-        let lastScope = null;
+        // Header for columns
+        console.log(`  ${c.dim}   [L] [G]  NAME${c.reset}`);
+
         for (let i = 0; i < agents.length; i++) {
             const agent = agents[i];
             const isSelected = i === selectedIndex;
-            const isFav = favoritesSnapshot[i];
-
-            // Scope header
-            if (agent.location.label !== lastScope) {
-                console.log(`  ${c.bold}${c.underlined}${agent.location.label.toUpperCase()}${c.reset}`);
-                lastScope = agent.location.label;
-            }
+            const isFav = agent.favorite;
 
             const cursor = isSelected ? c.magenta + sym.arrow + c.reset : ' ';
-            const favIcon = isFav ? c.yellow + star + c.reset : c.dim + ' ' + c.reset;
+            const favIcon = isFav ? c.yellow + star + c.reset : ' ';
+
+            // Status indicators with changed state logic
+            // We use specific colors for local vs global columns to differentiate columns visually? 
+            // Actually reusing logic is clearer. Let's tweak slightly for "Global" vs "Local" letters.
+            const localIndRaw = agent.wantsLocal ? (agent.isLocal ? c.green + '[L]' : c.green + '[+]') : (agent.isLocal ? c.red + '[-]' : c.dim + '[ ]');
+            const globalIndRaw = agent.wantsGlobal ? (agent.isGlobal ? c.blue + '[G]' : c.blue + '[+]') : (agent.isGlobal ? c.red + '[-]' : c.dim + '[ ]');
+
+            // Restore color reset
+            const localInd = localIndRaw + c.reset;
+            const globalInd = globalIndRaw + c.reset;
+
+            // Formatting
             const nameColor = isSelected ? c.magenta + c.bold : (isFav ? c.reset : c.dim);
 
-            let line = `  ${cursor} ${favIcon} ${nameColor}${agent.name.padEnd(sidebarWidth - 5)}${c.reset}`;
-
-            // Add sidebar separator
+            // Construct line
+            let line = `  ${cursor} ${localInd} ${globalInd}  ${nameColor}${agent.name.padEnd(14)}${c.reset}`;
             line += c.dim + ' │ ' + c.reset;
 
-            if (i < 20) { // Limit list height
+            if (i < 20) {
                 process.stdout.write(line + '\n');
             }
         }
 
-        // Now print the detail pane specifically for the selected agent
-        // We'll use ANSI escape codes to jump back up and print on the right side
+        // --- Detail Pane ---
         const detailStartY = 4;
         const detailStartX = sidebarWidth + 5;
         const agent = agents[selectedIndex];
 
+        // Status Text
+        let statusText = '';
+        if (agent.wantsLocal) statusText += c.green + 'Local ' + c.reset;
+        if (agent.wantsGlobal) statusText += c.blue + 'Global ' + c.reset;
+        if (!agent.wantsLocal && !agent.wantsGlobal) statusText = c.dim + 'None' + c.reset;
+
         const details = [
             `${c.magenta}${c.bold}${agent.name.toUpperCase()}${c.reset}`,
+            `Status: ${statusText}`,
+            '',
             `${c.dim}${agent.description}${c.reset}`,
             '',
             agent.asciiArt ? agent.asciiArt : `${c.dim}[ No Portrait ]${c.reset}`
         ];
 
+        // Draw details
         const allDetailLines = details.flatMap(d => d.split('\n'));
         for (let i = 0; i < allDetailLines.length; i++) {
             process.stdout.write(`\x1b[${detailStartY + i};${detailStartX}H${allDetailLines[i]}`);
@@ -3021,35 +3180,110 @@ async function agentsInteractive() {
 
         // Footer
         process.stdout.write(`\x1b[${Math.max(agents.length + 6, 25)};1H`);
-        console.log(`\n  ${c.dim}↑/↓: Navigate • Space: Toggle • Enter: Save • Esc/q: Quit${c.reset}`);
+
+        // Calc pending changes
+        let pendingCount = 0;
+        agents.forEach(a => {
+            if (a.isLocal !== a.wantsLocal) pendingCount++;
+            if (a.isGlobal !== a.wantsGlobal) pendingCount++;
+        });
+
+        const actionPrompt = pendingCount > 0
+            ? `${c.yellow}Enter: Apply ${pendingCount} Changes${c.reset}`
+            : `${c.dim}Enter: Done${c.reset}`;
+
+        console.log(`\n  ${c.dim}L: Toggle Local • G: Toggle Global • ${actionPrompt} ${c.dim}• Esc: Cancel${c.reset}`);
     };
 
     render();
 
+    // Input Handling
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    emitKeypressEvents(process.stdin);
+    if (process.stdin.isTTY) process.stdin.setRawMode(true);
+
     return new Promise((resolve) => {
+        const applyChanges = () => {
+            let changed = false;
+
+            // Process all agents
+            agents.forEach(agent => {
+                // LOCAL
+                if (localPath && agent.isLocal !== agent.wantsLocal) {
+                    const dest = join(localPath, agent.fileName);
+                    if (agent.wantsLocal) {
+                        ensureDir(localPath);
+                        copyFileSync(agent.path, dest);
+                    } else {
+                        if (existsSync(dest)) fs.unlinkSync(dest);
+                    }
+                    changed = true;
+                }
+
+                // GLOBAL
+                if (globalPath && agent.isGlobal !== agent.wantsGlobal) {
+                    const dest = join(globalPath, agent.fileName);
+                    if (agent.wantsGlobal) {
+                        ensureDir(globalPath);
+                        copyFileSync(agent.path, dest);
+                    } else {
+                        if (existsSync(dest)) fs.unlinkSync(dest);
+                    }
+                    changed = true;
+                }
+            });
+
+            if (changed) {
+                console.log(`\n  ${c.green}${sym.check}${c.reset} Changes applied.`);
+            }
+        };
+
         const onKey = async (str, key) => {
+            if (key.ctrl && key.name === 'c') {
+                cleanup(); process.exit();
+            }
+
             if (key.name === 'up') {
                 selectedIndex = (selectedIndex - 1 + agents.length) % agents.length;
                 render();
             } else if (key.name === 'down') {
                 selectedIndex = (selectedIndex + 1) % agents.length;
                 render();
+            } else if (key.name === 'l') {
+                if (key.shift) {
+                    // Toggle ALL based on majority
+                    const installCount = agents.filter(a => a.wantsLocal).length;
+                    const majorityInstalled = installCount >= (agents.length / 2);
+                    const targetState = !majorityInstalled;
+                    agents.forEach(a => a.wantsLocal = targetState);
+                } else {
+                    const agent = agents[selectedIndex];
+                    agent.wantsLocal = !agent.wantsLocal;
+                }
+                render();
+            } else if (key.name === 'g') {
+                if (key.shift) {
+                    // Toggle ALL based on majority
+                    const installCount = agents.filter(a => a.wantsGlobal).length;
+                    const majorityInstalled = installCount >= (agents.length / 2);
+                    const targetState = !majorityInstalled;
+                    agents.forEach(a => a.wantsGlobal = targetState);
+                } else {
+                    const agent = agents[selectedIndex];
+                    agent.wantsGlobal = !agent.wantsGlobal;
+                }
+                render();
             } else if (key.name === 'space') {
-                favoritesSnapshot[selectedIndex] = !favoritesSnapshot[selectedIndex];
-                changed = true;
+                // Toggle Favorite (Still instant for config)
+                const agent = agents[selectedIndex];
+                agent.favorite = !agent.favorite;
+                toggleFavorite(agent.name);
                 render();
             } else if (key.name === 'return') {
-                // Save changes
-                if (changed) {
-                    const config = loadConfig();
-                    const newFavs = agents.filter((a, i) => favoritesSnapshot[i]).map(a => a.name);
-                    config.favorites = newFavs;
-                    saveConfig(config);
-                    console.log(`\n  ${c.green}${sym.check}${c.reset} Configuration saved.`);
-                }
                 cleanup();
+                applyChanges();
                 resolve();
-            } else if (key.name === 'q' || key.name === 'escape' || (key.ctrl && key.name === 'c')) {
+            } else if (key.name === 'q' || key.name === 'escape') {
                 cleanup();
                 resolve();
             }
@@ -3057,11 +3291,9 @@ async function agentsInteractive() {
 
         const cleanup = () => {
             process.stdin.removeListener('keypress', onKey);
-            if (process.stdin.isTTY) {
-                process.stdin.setRawMode(false);
-            }
+            if (process.stdin.isTTY) process.stdin.setRawMode(false);
             rl.close();
-            console.log('\x1b[2J\x1b[H'); // Clear final screen
+            process.stdout.write('\x1b[2J\x1b[H');
         };
 
         process.stdin.on('keypress', onKey);
@@ -3848,7 +4080,7 @@ export async function run(args) {
                 initNonInteractive(scope, opts.force, opts.tools, opts.path);
             } else {
                 // NEW: Show dashboard by default
-                dashboard();
+                await dashboard();
             }
 
             break;
