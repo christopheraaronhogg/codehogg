@@ -1,6 +1,6 @@
 {
   "name": "writethevision",
-  "version": "7.0.6",
+  "version": "7.0.7",
   "description": "Write The Vision (WTV): vision-driven development with the Habakkuk workflow. 10 agents + 21 skills for Claude Code, Codex CLI, and OpenCode.",
   "author": "Christopher Hogg",
   "license": "MIT",

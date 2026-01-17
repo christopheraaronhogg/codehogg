@@ -3265,8 +3265,10 @@ async function runEngine(engine, promptText) {
     }
 
     if (normalized === 'claude') {
+        // Claude Code CLI: avoid stream-json requirements (needs --verbose with --print).
+        // We don't parse output here, so default output is fine.
         return await new Promise((resolve, reject) => {
-            const child = spawn('claude', ['--dangerously-skip-permissions', '--output-format', 'stream-json', '-p', promptText], { stdio: 'inherit' });
+            const child = spawn('claude', ['--dangerously-skip-permissions', '-p', promptText], { stdio: 'inherit' });
             child.on('error', reject);
             child.on('exit', (code) => resolve(code ?? 1));
         });
@@ -3389,10 +3391,9 @@ async function visionRunner(opts) {
     const prdPath = join(process.cwd(), 'PRD.md');
     const progressPath = join(process.cwd(), 'progress.txt');
 
-    const defaultEngine = normalizeVisionRunnerEngine(opts.engine || config.defaultTool || 'opencode');
-    let engine = defaultEngine;
+    let engine = normalizeVisionRunnerEngine(opts.engine || null);
 
-    if (!engine || !isSupportedVisionRunnerEngine(engine)) {
+    if (engine && !isSupportedVisionRunnerEngine(engine)) {
         engine = null;
     }
 
