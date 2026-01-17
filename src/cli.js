@@ -402,13 +402,71 @@ function getAgentLocations() {
     return locations;
 }
 
-function brickifyAsciiArt(asciiArt) {
-    if (!asciiArt) return asciiArt;
+const BLOCK_FONT_3X5 = {
+    A: ['███', '█ █', '███', '█ █', '█ █'],
+    B: ['██ ', '█ █', '██ ', '█ █', '██ '],
+    C: ['███', '█  ', '█  ', '█  ', '███'],
+    D: ['██ ', '█ █', '█ █', '█ █', '██ '],
+    E: ['███', '█  ', '██ ', '█  ', '███'],
+    F: ['███', '█  ', '██ ', '█  ', '█  '],
+    G: ['███', '█  ', '█ █', '█ █', '███'],
+    H: ['█ █', '█ █', '███', '█ █', '█ █'],
+    I: ['███', ' █ ', ' █ ', ' █ ', '███'],
+    J: [' ██', '  █', '  █', '█ █', '██ '],
+    K: ['█ █', '█ █', '██ ', '█ █', '█ █'],
+    L: ['█  ', '█  ', '█  ', '█  ', '███'],
+    M: ['█ █', '███', '███', '█ █', '█ █'],
+    N: ['█ █', '███', '███', '███', '█ █'],
+    O: ['███', '█ █', '█ █', '█ █', '███'],
+    P: ['███', '█ █', '███', '█  ', '█  '],
+    Q: ['███', '█ █', '█ █', '███', '  █'],
+    R: ['███', '█ █', '███', '█ █', '█ █'],
+    S: ['███', '█  ', '███', '  █', '███'],
+    T: ['███', ' █ ', ' █ ', ' █ ', ' █ '],
+    U: ['█ █', '█ █', '█ █', '█ █', '███'],
+    V: ['█ █', '█ █', '█ █', '█ █', ' █ '],
+    W: ['█ █', '█ █', '███', '███', '█ █'],
+    X: ['█ █', '█ █', ' █ ', '█ █', '█ █'],
+    Y: ['█ █', '█ █', ' █ ', ' █ ', ' █ '],
+    Z: ['███', '  █', ' █ ', '█  ', '███'],
+    ' ': ['   ', '   ', '   ', '   ', '   '],
+    '-': ['   ', '   ', '███', '   ', '   '],
+    '?': ['███', '  █', ' ██', '   ', ' █ '],
+};
 
-    return asciiArt
-        .split('\n')
-        .map(line => line.replace(/[^\s]/g, '█'))
-        .join('\n');
+function renderBlockText(text, { maxWidth = null, color = null, bold = false } = {}) {
+    const normalized = String(text || '').toUpperCase();
+    const glyphWidth = 3;
+    const letterGap = 1;
+    const maxCharsPerLine = maxWidth
+        ? Math.max(1, Math.floor((maxWidth + letterGap) / (glyphWidth + letterGap)))
+        : normalized.length;
+
+    const chunks = [];
+    for (let i = 0; i < normalized.length; i += maxCharsPerLine) {
+        chunks.push(normalized.slice(i, i + maxCharsPerLine));
+    }
+
+    const renderedLines = [];
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+        const chunk = chunks[chunkIndex];
+        for (let row = 0; row < 5; row++) {
+            const rowText = chunk
+                .split('')
+                .map(ch => (BLOCK_FONT_3X5[ch] ? BLOCK_FONT_3X5[ch][row] : BLOCK_FONT_3X5['?']?.[row] || '???'))
+                .join(' '.repeat(letterGap));
+
+            const prefix = color ? (bold ? color + c.bold : color) : '';
+            const suffix = color ? c.reset : '';
+            renderedLines.push(prefix + rowText + suffix);
+        }
+
+        if (chunkIndex !== chunks.length - 1) {
+            renderedLines.push('');
+        }
+    }
+
+    return renderedLines.join('\n');
 }
 
 function parseAgentFile(filePath) {
@@ -453,7 +511,7 @@ function parseAgentFile(filePath) {
         let asciiArt = '';
         const asciiMatch = content.match(/```text\n([\s\S]+?)\n```/);
         if (asciiMatch) {
-            asciiArt = brickifyAsciiArt(asciiMatch[1]);
+            asciiArt = asciiMatch[1];
         }
 
         return {
@@ -1685,11 +1743,7 @@ async function meetTheTeam() {
     console.log(`  ${c.bold}${c.yellow}PAUL — THE MASTERBUILDER${c.reset}`);
     console.log(`  ${c.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${c.reset}`);
     const paulAgent = parseAgentFile(join(TEMPLATES_DIR, 'agents', 'paul.md'));
-    if (paulAgent && paulAgent.asciiArt) {
-        console.log(paulAgent.asciiArt);
-    } else {
-        console.log(AVATARS.paul);
-    }
+    console.log(AVATARS.paul || (paulAgent && paulAgent.asciiArt ? paulAgent.asciiArt : ''));
     await sleep(shortPause);
     console.log(`
   ${c.cyan}"According to the grace of God which is given unto me,${c.reset}
@@ -1719,11 +1773,7 @@ async function meetTheTeam() {
         console.log(`  ${artisan.color}${c.bold}${artisan.name}${c.reset}`);
         const templatePath = join(TEMPLATES_DIR, 'agents', artisan.file);
         const agent = parseAgentFile(templatePath);
-        if (agent && agent.asciiArt) {
-            console.log(agent.asciiArt);
-        } else {
-            console.log(AVATARS[artisan.id]);
-        }
+        console.log(AVATARS[artisan.id] || (agent && agent.asciiArt ? agent.asciiArt : ''));
         console.log(`  ${c.dim}${artisan.domain}${c.reset}`);
         if (artisan.verse) {
             console.log(`  ${c.dim}${artisan.verse.ref}${c.reset} ${c.dim}"${artisan.verse.text}"${c.reset}`);
@@ -3522,13 +3572,15 @@ async function agentsInteractive() {
         if (agent.wantsGlobal) statusText += c.blue + 'Global ' + c.reset;
         if (!agent.wantsLocal && !agent.wantsGlobal) statusText = c.dim + 'None' + c.reset;
 
+        const terminalWidth = process.stdout.columns || 80;
+        const detailWidth = Math.max(20, terminalWidth - detailStartX - 1);
+        const nameBanner = renderBlockText(agent.name, { maxWidth: detailWidth, color: c.magenta, bold: true });
+
         const details = [
-            `${c.magenta}${c.bold}${agent.name.toUpperCase()}${c.reset}`,
+            nameBanner,
             `Status: ${statusText}`,
             '',
             `${c.dim}${agent.description}${c.reset}`,
-            '',
-            agent.asciiArt ? agent.asciiArt : `${c.dim}[ No Portrait ]${c.reset}`
         ];
 
         // Draw details
