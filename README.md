@@ -253,6 +253,7 @@ wtv board               # Show kanban board
 wtv cry "description"   # Enter a problem or need
 wtv wait <id>           # Move to waiting (seeking)
 wtv vision <id>         # Move to vision (answer received)
+wtv run                 # Execute a vision (PRD loop)
 wtv run <id>            # Move to execution
 wtv worship <id>        # Complete with retrospective
 
@@ -293,6 +294,18 @@ When you move an item to RUN, invoke the Masterbuilder inside your AI CLI:
 
 The Masterbuilder reads your vision document and coordinates the artisans.
 
+## Vision Runner (Ralphy-Style)
+
+`wtv run` can also execute a project vision directly by generating a `PRD.md` (checklist) and iterating until all tasks are complete.
+
+It maintains a `progress.txt` checkpoint log and, by default, creates a single git commit and pushes once at the end.
+
+```bash
+wtv run
+# or non-interactive
+wtv run --vision vision/VISION.md --engine opencode
+```
+
 ## Creating Custom Agents
 
 ```bash
@@ -327,6 +340,7 @@ wtv board                # Show kanban board
 wtv cry "description"    # Enter a problem
 wtv wait <id>            # Move to waiting
 wtv vision <id>          # Move to vision
+wtv run                  # Execute a vision (PRD loop)
 wtv run <id>             # Move to execution
 wtv worship <id>         # Complete with retrospective
 wtv note <id> "text"     # Add note to item

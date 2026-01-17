@@ -3152,6 +3152,453 @@ Prototype
 }
 
 // ============================================================================
+// VISION RUNNER (Ralphy-style execution)
+// ============================================================================
+
+const VISION_RUNNER_ENGINES = ['opencode', 'codex', 'claude'];
+
+function normalizeVisionRunnerEngine(engine) {
+    if (!engine) return null;
+    return String(engine).trim().toLowerCase();
+}
+
+function isSupportedVisionRunnerEngine(engine) {
+    return VISION_RUNNER_ENGINES.includes(engine);
+}
+
+function discoverVisionDocs() {
+    const visionDirPath = join(process.cwd(), 'vision');
+    const rootVisionPath = join(process.cwd(), 'VISION.md');
+
+    const files = [];
+    if (existsSync(rootVisionPath)) {
+        files.push({
+            path: rootVisionPath,
+            label: 'VISION.md (Root)',
+        });
+    }
+
+    if (existsSync(visionDirPath) && lstatSync(visionDirPath).isDirectory()) {
+        const vFiles = readdirSync(visionDirPath)
+            .filter(f => f.endsWith('.md'))
+            .sort((a, b) => a.localeCompare(b))
+            .map(f => ({
+                path: join(visionDirPath, f),
+                label: `vision/${f}`,
+            }));
+        files.push(...vFiles);
+    }
+
+    return files;
+}
+
+function countUncheckedPrdTasks(prdContent) {
+    const matches = prdContent.match(/^- \[ \] .+$/gm);
+    return matches ? matches.length : 0;
+}
+
+function getNextUncheckedPrdTask(prdContent) {
+    const match = prdContent.match(/^- \[ \] (.+)$/m);
+    return match ? match[1].trim() : null;
+}
+
+function runGit(args) {
+    return spawnSync('git', args, {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+    });
+}
+
+function isGitRepo() {
+    const res = runGit(['rev-parse', '--is-inside-work-tree']);
+    return res.status === 0 && String(res.stdout || '').trim() === 'true';
+}
+
+function getGitHeadSha() {
+    const res = runGit(['rev-parse', 'HEAD']);
+    if (res.status !== 0) return null;
+    const sha = String(res.stdout || '').trim();
+    return sha ? sha : null;
+}
+
+function isWorkingTreeClean() {
+    const res = runGit(['status', '--porcelain']);
+    if (res.status !== 0) return false;
+    return String(res.stdout || '').trim().length === 0;
+}
+
+function getCurrentBranch() {
+    const res = runGit(['rev-parse', '--abbrev-ref', 'HEAD']);
+    if (res.status !== 0) return null;
+    const branch = String(res.stdout || '').trim();
+    return branch ? branch : null;
+}
+
+function commandExists(cmd) {
+    const locator = process.platform === 'win32' ? 'where' : 'which';
+    const res = spawnSync(locator, [cmd], { stdio: ['ignore', 'ignore', 'ignore'] });
+    return res.status === 0;
+}
+
+async function runEngine(engine, promptText) {
+    const normalized = normalizeVisionRunnerEngine(engine);
+
+    if (normalized === 'opencode') {
+        const env = {
+            ...process.env,
+            OPENCODE_PERMISSION: '{"*":"allow"}',
+        };
+
+        return await new Promise((resolve, reject) => {
+            const child = spawn('opencode', ['run', '--format', 'json', promptText], { stdio: 'inherit', env });
+            child.on('error', reject);
+            child.on('exit', (code) => resolve(code ?? 1));
+        });
+    }
+
+    if (normalized === 'codex') {
+        return await new Promise((resolve, reject) => {
+            const child = spawn('codex', ['exec', '--full-auto', '--json', promptText], { stdio: 'inherit' });
+            child.on('error', reject);
+            child.on('exit', (code) => resolve(code ?? 1));
+        });
+    }
+
+    if (normalized === 'claude') {
+        return await new Promise((resolve, reject) => {
+            const child = spawn('claude', ['--dangerously-skip-permissions', '--output-format', 'stream-json', '-p', promptText], { stdio: 'inherit' });
+            child.on('error', reject);
+            child.on('exit', (code) => resolve(code ?? 1));
+        });
+    }
+
+    throw new Error(`Unsupported engine: ${engine}`);
+}
+
+function ensureProgressHeader(progressPath, { visionPath, engine, startSha }) {
+    if (!existsSync(progressPath)) {
+        writeFileSync(progressPath, '');
+    }
+
+    const existing = readFileSync(progressPath, 'utf8');
+    if (existing.trim().length > 0) return;
+
+    const startedAt = new Date().toISOString();
+    const header = [
+        `WTV Vision Runner`,
+        `Started: ${startedAt}`,
+        `Vision: ${visionPath}`,
+        `Engine: ${engine}`,
+        startSha ? `Start SHA: ${startSha}` : `Start SHA: (not a git repo)`,
+        '',
+    ].join('\n');
+
+    writeFileSync(progressPath, header);
+}
+
+async function generatePrdFromVision({ engine, visionPath, prdPath }) {
+    const visionContent = readFileSync(visionPath, 'utf8');
+
+    const promptText = `You are generating a PRD for a software project.
+
+Input vision document:
+---
+${visionContent}
+---
+
+Create or overwrite PRD.md in the project root.
+
+Requirements:
+- Must include a section titled "## Tasks".
+- Under "## Tasks", write a detailed implementation checklist using GitHub-flavored markdown checkboxes:
+  - Each item must use '- [ ] ' (unchecked).
+  - Tasks must be small, sequential, and unambiguous.
+- Do NOT implement any code yet.
+- Do NOT run git commit or git push.
+- Output is the updated files on disk (PRD.md).`;
+
+    const code = await runEngine(engine, promptText);
+    if (code !== 0) {
+        throw new Error(`Engine exited with code ${code} while generating PRD.md`);
+    }
+
+    if (!existsSync(prdPath)) {
+        throw new Error('PRD.md was not created');
+    }
+
+    const prdContent = readFileSync(prdPath, 'utf8');
+    if (countUncheckedPrdTasks(prdContent) === 0) {
+        throw new Error('PRD.md has no unchecked tasks (- [ ])');
+    }
+}
+
+async function runVisionTaskIteration({ engine, prdPath, progressPath, taskText, noTests, noLint }) {
+    const promptText = `You are an autonomous coding agent executing a PRD.
+
+Files:
+- PRD.md (checklist)
+- progress.txt (checkpoint log)
+
+Task to implement (ONLY this task):
+"${taskText}"
+
+Rules:
+- Implement ONLY the task above.
+- Update PRD.md: change that exact task from '- [ ]' to '- [x]'.
+- Append a short checkpoint entry to progress.txt.
+- Do NOT run git commit.
+- Do NOT run git push.
+
+Verification:
+${noTests ? '- Skip tests.' : '- Write and run tests; they must pass.'}
+${noLint ? '- Skip lint.' : '- Run linting; it must pass.'}
+
+Stop after completing this one task.`;
+
+    const beforePrd = readFileSync(prdPath, 'utf8');
+    const beforeUnchecked = countUncheckedPrdTasks(beforePrd);
+
+    const progressBefore = existsSync(progressPath) ? readFileSync(progressPath, 'utf8') : '';
+
+    const code = await runEngine(engine, promptText);
+    if (code !== 0) {
+        throw new Error(`Engine exited with code ${code}`);
+    }
+
+    const afterPrd = readFileSync(prdPath, 'utf8');
+    const afterUnchecked = countUncheckedPrdTasks(afterPrd);
+
+    const stillUnchecked = afterPrd.includes(`- [ ] ${taskText}`);
+    const nowChecked = afterPrd.includes(`- [x] ${taskText}`);
+
+    if (stillUnchecked || (!nowChecked && afterUnchecked >= beforeUnchecked)) {
+        throw new Error('PRD.md was not updated to mark the task complete');
+    }
+
+    const progressAfter = existsSync(progressPath) ? readFileSync(progressPath, 'utf8') : '';
+    if (progressAfter === progressBefore) {
+        const stamp = new Date().toISOString();
+        writeFileSync(progressPath, progressAfter + `\n[${stamp}] Completed: ${taskText}\n`);
+    }
+}
+
+async function visionRunner(opts) {
+    const config = loadConfig();
+    const interactive = process.stdout.isTTY && process.stdin.isTTY;
+
+    const prdPath = join(process.cwd(), 'PRD.md');
+    const progressPath = join(process.cwd(), 'progress.txt');
+
+    const defaultEngine = normalizeVisionRunnerEngine(opts.engine || config.defaultTool || 'opencode');
+    let engine = defaultEngine;
+
+    if (!engine || !isSupportedVisionRunnerEngine(engine)) {
+        engine = null;
+    }
+
+    if (!engine) {
+        if (!interactive) {
+            console.log(`\n  ${c.red}Error:${c.reset} --engine is required when not running interactively.\n`);
+            return;
+        }
+
+        engine = await select('Engine:', [
+            { value: 'opencode', label: 'OpenCode (recommended)' },
+            { value: 'codex', label: 'Codex CLI' },
+            { value: 'claude', label: 'Claude Code' },
+        ]);
+    }
+
+    if (!engine || !isSupportedVisionRunnerEngine(engine)) {
+        console.log(`\n  ${c.red}Error:${c.reset} Unsupported engine: ${engine}\n`);
+        return;
+    }
+
+    if (!commandExists(engine === 'claude' ? 'claude' : engine)) {
+        console.log(`\n  ${c.red}Error:${c.reset} Required CLI not found in PATH for engine: ${engine}\n`);
+        return;
+    }
+
+    let visionPath = null;
+    if (opts.vision) {
+        visionPath = resolve(process.cwd(), opts.vision);
+        if (!existsSync(visionPath)) {
+            console.log(`\n  ${c.red}Error:${c.reset} Vision file not found: ${visionPath}\n`);
+            return;
+        }
+    } else {
+        let docs = discoverVisionDocs();
+        if (docs.length === 0) {
+            if (!interactive) {
+                console.log(`\n  ${c.red}Error:${c.reset} No vision documents found. Pass --vision to run non-interactively.\n`);
+                return;
+            }
+
+            console.log(`\n  ${c.yellow}${sym.warn}${c.reset} No vision documents found.`);
+            const create = await confirm('Create VISION.md now?', true);
+            if (!create) return;
+            await initVision('project');
+        }
+
+        docs = discoverVisionDocs();
+        if (docs.length === 0) {
+            console.log(`\n  ${c.red}Error:${c.reset} No vision documents available to run.\n`);
+            return;
+        }
+
+        visionPath = await select('Select vision document:', docs.map(d => ({ value: d.path, label: d.label })));
+        if (!visionPath) return;
+    }
+
+    const hasGit = isGitRepo();
+    const startSha = hasGit ? getGitHeadSha() : null;
+
+    if (hasGit && !isWorkingTreeClean() && !opts.dryRun) {
+        if (!interactive) {
+            console.log(`\n  ${c.red}Error:${c.reset} Working tree is not clean (non-interactive mode).\n`);
+            return;
+        }
+
+        const proceed = await confirm('Working tree is not clean. Continue anyway?', false);
+        if (!proceed) return;
+    }
+
+    if (interactive && !opts.dryRun) {
+        const proceed = await confirm(`Run vision with ${engine} (will modify files)?`, false);
+        if (!proceed) return;
+    }
+
+    const shouldPush = hasGit && !opts.noPush;
+
+    if (opts.dryRun) {
+        console.log(`\n  ${c.bold}Dry run${c.reset}`);
+        console.log(`  Vision: ${visionPath}`);
+        console.log(`  Engine: ${engine}`);
+        console.log(`  PRD: ${prdPath}`);
+        console.log(`  Progress: ${progressPath}`);
+        console.log(`  Commit+push at end: ${shouldPush ? 'yes' : 'no'}`);
+        console.log('');
+        return;
+    }
+
+    let resume = opts.resume;
+
+    if (!resume && existsSync(prdPath) && !opts.regeneratePrd) {
+        if (!interactive) {
+            // Safe non-interactive default: continue existing PRD.
+            resume = true;
+        } else {
+            const choice = await select('PRD.md already exists. What do you want to do?', [
+                { value: 'resume', label: 'Resume existing PRD.md (recommended)' },
+                { value: 'regenerate', label: 'Regenerate PRD.md from vision' },
+                { value: 'cancel', label: 'Cancel' },
+            ]);
+
+            if (choice === 'cancel') return;
+            if (choice === 'resume') resume = true;
+            if (choice === 'regenerate') resume = false;
+        }
+    }
+
+    if (!resume) {
+        await generatePrdFromVision({ engine, visionPath, prdPath });
+    } else {
+        if (!existsSync(prdPath)) {
+            console.log(`\n  ${c.red}Error:${c.reset} PRD.md not found (use without --resume to generate one).\n`);
+            return;
+        }
+    }
+
+    ensureProgressHeader(progressPath, { visionPath, engine, startSha });
+
+    let iteration = 0;
+
+    while (true) {
+        const prdContent = readFileSync(prdPath, 'utf8');
+        const nextTask = getNextUncheckedPrdTask(prdContent);
+
+        if (!nextTask) {
+            break;
+        }
+
+        if (opts.maxIterations > 0 && iteration >= opts.maxIterations) {
+            console.log(`\n  ${c.yellow}${sym.warn}${c.reset} Stopped after max iterations (${opts.maxIterations}).`);
+            console.log(`  Remaining tasks: ${countUncheckedPrdTasks(prdContent)}\n`);
+            return;
+        }
+
+        iteration++;
+        console.log(`\n  ${c.cyan}${sym.bullet}${c.reset} Task ${iteration}: ${nextTask}`);
+
+        try {
+            await runVisionTaskIteration({
+                engine,
+                prdPath,
+                progressPath,
+                taskText: nextTask,
+                noTests: opts.noTests,
+                noLint: opts.noLint,
+            });
+        } catch (err) {
+            console.log(`\n  ${c.red}${sym.cross}${c.reset} Vision Runner failed: ${err.message}`);
+            if (startSha) {
+                console.log(`  Rollback: ${c.cyan}git reset --hard ${startSha}${c.reset}`);
+            }
+            console.log('');
+            return;
+        }
+    }
+
+    if (!hasGit) {
+        console.log(`\n  ${c.green}${sym.check}${c.reset} PRD complete (no git repo detected).\n`);
+        return;
+    }
+
+    const prdFinal = readFileSync(prdPath, 'utf8');
+    if (countUncheckedPrdTasks(prdFinal) > 0) {
+        console.log(`\n  ${c.yellow}${sym.warn}${c.reset} PRD still has remaining tasks; skipping commit/push.\n`);
+        return;
+    }
+
+    const visionName = basename(visionPath).replace(/\.md$/, '');
+    const commitMessage = `feat: run vision (${visionName})`;
+
+    const addRes = runGit(['add', '-A']);
+    if (addRes.status !== 0) {
+        console.log(`\n  ${c.red}${sym.cross}${c.reset} git add failed.\n`);
+        return;
+    }
+
+    const statusRes = runGit(['status', '--porcelain']);
+    if (statusRes.status === 0 && String(statusRes.stdout || '').trim().length === 0) {
+        console.log(`\n  ${c.green}${sym.check}${c.reset} Nothing to commit.\n`);
+        return;
+    }
+
+    const commitRes = runGit(['commit', '-m', commitMessage]);
+    if (commitRes.status !== 0) {
+        console.log(`\n  ${c.red}${sym.cross}${c.reset} git commit failed.\n`);
+        return;
+    }
+
+    if (!opts.noPush) {
+        const pushRes = runGit(['push']);
+        if (pushRes.status !== 0) {
+            const branch = getCurrentBranch();
+            if (branch) {
+                runGit(['push', '-u', 'origin', branch]);
+            }
+        }
+    }
+
+    console.log(`\n  ${c.green}${sym.check}${c.reset} Vision complete.`);
+    if (startSha) {
+        console.log(`  Started from: ${c.dim}${startSha}${c.reset}`);
+    }
+    console.log('');
+}
+
+// ============================================================================
 // DASHBOARD (Agent Command Center)
 // ============================================================================
 
@@ -4118,6 +4565,7 @@ function showHelp() {
     console.log(`${pad}  ${c.cyan}vision${c.reset}        Show VISION.md status`);
     console.log(`${pad}  ${c.cyan}log${c.reset}           Show task logs`);
     console.log(`${pad}  ${c.cyan}meet${c.reset}          Meet Paul and the Artisans`);
+    console.log(`${pad}  ${c.cyan}run${c.reset}           Run the vision (PRD loop)`);
     console.log(`${pad}  ${c.cyan}help${c.reset}          Show this help\n`);
 
     console.log(`${pad}${c.bold}Agent Commands${c.reset}`);
@@ -4133,7 +4581,7 @@ function showHelp() {
     console.log(`${pad}  ${c.cyan}cry${c.reset} "desc"          Enter a problem or need`);
     console.log(`${pad}  ${c.cyan}wait${c.reset} <id>           Move to waiting (seeking)`);
     console.log(`${pad}  ${c.cyan}vision${c.reset} <id>         Move to vision (answer received)`);
-    console.log(`${pad}  ${c.cyan}run${c.reset} <id>            Move to run (execute)`);
+    console.log(`${pad}  ${c.cyan}run${c.reset} [id]           Run the vision, or move item to run`);
     console.log(`${pad}  ${c.cyan}worship${c.reset} <id>        Move to worship (retrospective)`);
     console.log(`${pad}  ${c.cyan}note${c.reset} <id> "text"    Add note to item`);
     console.log(`${pad}  ${c.cyan}item${c.reset} <id>           Show item details`);
@@ -4157,6 +4605,7 @@ function showHelp() {
     console.log(`${pad}  ${c.green}wtv init --claude${c.reset}            ${c.dim}# Install for Claude Code${c.reset}`);
     console.log(`${pad}  ${c.green}wtv init --opencode${c.reset}          ${c.dim}# Install for OpenCode${c.reset}`);
     console.log(`${pad}  ${c.green}wtv init --codex${c.reset}            ${c.dim}# Install for Codex CLI${c.reset}`);
+    console.log(`${pad}  ${c.green}wtv run${c.reset}                      ${c.dim}# Execute a vision with PRD.md${c.reset}`);
     console.log(`${pad}  ${c.green}wtv board --all${c.reset}              ${c.dim}# Show full kanban board${c.reset}`);
     console.log(`${pad}  ${c.green}wtv uninstall --tool opencode${c.reset} ${c.dim}# Remove OpenCode install${c.reset}`);
     console.log('');
@@ -4175,6 +4624,18 @@ function parseArgs(args) {
         task: null,
         date: null,
         all: false,
+
+        // Vision Runner (Ralphy-style)
+        engine: null,
+        vision: null,
+        resume: false,
+        regeneratePrd: false,
+        maxIterations: 0,
+        dryRun: false,
+        fast: false,
+        noTests: false,
+        noLint: false,
+        noPush: false,
     };
 
     let positionalCount = 0;
@@ -4209,6 +4670,77 @@ function parseArgs(args) {
 
         if (a === '--all') {
             opts.all = true;
+            continue;
+        }
+
+        if (a === '--vision') {
+            const v = args[i + 1];
+            if (!v || v.startsWith('-')) {
+                throw new Error("--vision requires a file path (e.g. '--vision vision/roadmap.md')");
+            }
+            opts.vision = v;
+            i++;
+            continue;
+        }
+
+        if (a === '--engine') {
+            const v = args[i + 1];
+            if (!v || v.startsWith('-')) {
+                throw new Error("--engine requires a value: opencode | codex | claude");
+            }
+            opts.engine = v;
+            i++;
+            continue;
+        }
+
+        if (a === '--resume') {
+            opts.resume = true;
+            continue;
+        }
+
+        if (a === '--regenerate-prd') {
+            opts.regeneratePrd = true;
+            continue;
+        }
+
+        if (a === '--max-iterations') {
+            const v = args[i + 1];
+            if (!v || v.startsWith('-')) {
+                throw new Error("--max-iterations requires a number (e.g. '--max-iterations 3')");
+            }
+            const n = parseInt(v, 10);
+            if (Number.isNaN(n) || n < 0) {
+                throw new Error('--max-iterations must be a non-negative number');
+            }
+            opts.maxIterations = n;
+            i++;
+            continue;
+        }
+
+        if (a === '--dry-run') {
+            opts.dryRun = true;
+            continue;
+        }
+
+        if (a === '--no-push') {
+            opts.noPush = true;
+            continue;
+        }
+
+        if (a === '--no-tests' || a === '--skip-tests') {
+            opts.noTests = true;
+            continue;
+        }
+
+        if (a === '--no-lint' || a === '--skip-lint') {
+            opts.noLint = true;
+            continue;
+        }
+
+        if (a === '--fast') {
+            opts.fast = true;
+            opts.noTests = true;
+            opts.noLint = true;
             continue;
         }
 
@@ -4467,12 +4999,18 @@ export async function run(args) {
         }
 
         case 'run': {
-            if (!opts.subcommand) {
-                console.log(`\n  ${c.red}Error:${c.reset} Item ID or slug required.`);
-                console.log(`  Usage: wtv run <id|slug>\n`);
+            if (opts.subcommand) {
+                habakkukRun(opts.subcommand);
+                break;
+            }
+
+            if (!process.stdout.isTTY && (!opts.vision || !opts.engine)) {
+                console.log(`\n  ${c.red}Error:${c.reset} run requires interactive TTY, or pass --vision and --engine.`);
+                console.log(`  Example: wtv run --vision vision/VISION.md --engine opencode\n`);
                 process.exit(1);
             }
-            habakkukRun(opts.subcommand);
+
+            await visionRunner(opts);
             break;
         }
 
