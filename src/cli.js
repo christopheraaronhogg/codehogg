@@ -3366,7 +3366,7 @@ Task to implement (ONLY this task):
 
 Rules:
 - Implement ONLY the task above.
-- Update PRD.md: change that exact task from '- [ ]' to '- [x]'.
+- Update PRD.md: change that exact task from '- [ ]' to '- [x]' (lowercase x).
 - Append a short checkpoint entry to progress.txt.
 - Do NOT run git commit.
 - Do NOT run git push.
@@ -3382,6 +3382,23 @@ Stop after completing this one task.`;
 
     const progressBefore = existsSync(progressPath) ? readFileSync(progressPath, 'utf8') : '';
 
+    const workDir = dirname(prdPath);
+    const gitProbe = spawnSync('git', ['rev-parse', '--is-inside-work-tree'], {
+        cwd: workDir,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const hasGit = gitProbe.status === 0 && String(gitProbe.stdout || '').trim() === 'true';
+    const statusBefore = hasGit
+        ? String(
+            spawnSync('git', ['status', '--porcelain'], {
+                cwd: workDir,
+                encoding: 'utf8',
+                stdio: ['ignore', 'pipe', 'pipe'],
+            }).stdout || '',
+        )
+        : '';
+
     const runFn = _runEngine || runEngine;
     const code = await runFn(engine, promptText);
     if (code !== 0) {
@@ -3391,10 +3408,61 @@ Stop after completing this one task.`;
     const afterPrd = readFileSync(prdPath, 'utf8');
     const afterUnchecked = countUncheckedPrdTasks(afterPrd);
 
-    const stillUnchecked = afterPrd.includes(`- [ ] ${taskText}`);
-    const nowChecked = afterPrd.includes(`- [x] ${taskText}`);
+    const escaped = taskText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const uncheckedRe = new RegExp(`^\\s*- \\[ \\]\\s+${escaped}\\s*$`, 'm');
+    const checkedRe = new RegExp(`^\\s*- \\[[xX]\\]\\s+${escaped}\\s*$`, 'm');
+
+    let stillUnchecked = uncheckedRe.test(afterPrd);
+    let nowChecked = checkedRe.test(afterPrd);
 
     if (stillUnchecked || (!nowChecked && afterUnchecked >= beforeUnchecked)) {
+        const statusAfter = hasGit
+            ? String(
+                spawnSync('git', ['status', '--porcelain'], {
+                    cwd: workDir,
+                    encoding: 'utf8',
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                }).stdout || '',
+            )
+            : '';
+
+        // Best-effort repair: if the engine changed files but forgot PRD.md, run a
+        // follow-up pass that ONLY updates PRD.md and progress.txt.
+        const hasAnyChanges = hasGit ? statusAfter !== statusBefore : false;
+        if (hasAnyChanges) {
+            const repairPrompt = `You previously completed this PRD task but did NOT update the checklist.
+
+Fix it now by editing ONLY these files:
+- PRD.md
+- progress.txt
+
+Rules:
+- Do NOT change any other files.
+- In PRD.md, find the exact checkbox line for this task and change '- [ ]' to '- [x]':
+  ${taskText}
+- Append a single new line to progress.txt: "[ISO_TIMESTAMP] Completed: ${taskText}"
+- Then stop.`;
+
+            const repairCode = await runFn(engine, repairPrompt);
+            if (repairCode !== 0) {
+                throw new Error(`Engine exited with code ${repairCode}`);
+            }
+
+            const repairedPrd = readFileSync(prdPath, 'utf8');
+            const repairedUnchecked = countUncheckedPrdTasks(repairedPrd);
+            stillUnchecked = uncheckedRe.test(repairedPrd);
+            nowChecked = checkedRe.test(repairedPrd);
+
+            if (!stillUnchecked && (nowChecked || repairedUnchecked < beforeUnchecked)) {
+                const repairedProgress = existsSync(progressPath) ? readFileSync(progressPath, 'utf8') : '';
+                if (repairedProgress === progressBefore) {
+                    const stamp = new Date().toISOString();
+                    writeFileSync(progressPath, repairedProgress + `\n[${stamp}] Completed: ${taskText}\n`);
+                }
+                return;
+            }
+        }
+
         throw new Error('PRD.md was not updated to mark the task complete');
     }
 
