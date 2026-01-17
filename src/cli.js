@@ -14,7 +14,7 @@ import {
     writeFileSync,
 } from 'fs';
 import { homedir, platform } from 'os';
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 
 async function openInEditor(filePath) {
     const editor = process.env.EDITOR || 'vi';
@@ -1249,15 +1249,16 @@ function habakkukStones() {
     console.log('');
 }
 
-function checkForUpdates() {
+async function checkForUpdates() {
     const shouldCheck = process.env.WTV_NO_UPDATE_CHECK !== '1' && process.env.CODEHOGG_NO_UPDATE_CHECK !== '1';
     if (!shouldCheck) return;
     if (!process.stdout.isTTY) return;
 
     try {
+        const packageName = getPackageName();
         const notifier = updateNotifier({
             pkg: {
-                name: getPackageName(),
+                name: packageName,
                 version: getVersion(),
             },
             updateCheckInterval: 1000 * 60 * 60 * 24 * 7,
@@ -1267,31 +1268,66 @@ function checkForUpdates() {
         const update = notifier.update;
         if (!update) return;
 
+        const npmGlobalCmd = `npm install -g ${packageName}@latest`;
+        const npxCmd = `npx -y ${packageName}@latest`;
+
         notifier.notify({
             message: `Update available ${c.dim}${update.current}${c.reset} → ${c.green}${update.latest}${c.reset}
-Run ${c.cyan}npx writethevision update${c.reset} to get the latest version`,
+
+Update global install:
+  ${c.cyan}${npmGlobalCmd}${c.reset}
+
+Or run latest once:
+  ${c.cyan}${npxCmd}${c.reset}
+`,
             defer: false,
             boxenOpts: {
                 padding: 1,
                 margin: 1,
-                align: 'center',
+                align: 'left',
                 borderColor: 'yellow',
                 borderStyle: 'round',
             },
         });
 
-        notifier.notify({
-            message: `Update available ${c.dim}${notifier.update.current}${c.reset} → ${c.green}${notifier.update.latest}${c.reset}\nRun ${c.cyan}npx writethevision update${c.reset} to get the latest version`,
-            defer: false,
-            boxenOpts: {
-                padding: 1,
-                margin: 1,
-                align: 'center',
-                borderColor: 'yellow',
-                borderStyle: 'round',
-            },
-        });
-    } catch (err) {
+        const shouldPrompt = process.stdin.isTTY && process.env.WTV_NO_AUTO_UPDATE !== '1' && !process.env.CI;
+        if (!shouldPrompt) return;
+
+        const isDevCheckout = existsSync(join(PACKAGE_ROOT, '.git'));
+        if (isDevCheckout) return;
+
+        const wantsUpdate = await confirm(`Update ${packageName} to v${update.latest} now?`, false);
+        if (!wantsUpdate) return;
+
+        const argv1 = process.argv[1] || '';
+        const userAgent = process.env.npm_config_user_agent || '';
+        const runningViaNpx = argv1.includes('_npx') || userAgent.includes('npx/');
+
+        if (runningViaNpx) {
+            console.log(`
+  ${c.yellow}${sym.warn}${c.reset} You're running via npx cache.`);
+            console.log(`  Next run: ${c.cyan}${npxCmd}${c.reset}
+`);
+            return;
+        }
+
+        const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+        const result = spawnSync(npmBin, ['install', '-g', `${packageName}@latest`], { stdio: 'inherit' });
+
+        if (result.status !== 0) {
+            console.log(`
+  ${c.red}${sym.cross}${c.reset} Update failed.`);
+            console.log(`  Try manually: ${c.cyan}${npmGlobalCmd}${c.reset}
+`);
+            return;
+        }
+
+        console.log(`
+  ${c.green}${sym.check}${c.reset} Updated ${packageName} to ${update.latest}.`);
+        console.log(`  Re-run ${c.cyan}wtv${c.reset} to use the new version.
+`);
+        process.exit(0);
+    } catch {
     }
 }
 
@@ -4272,7 +4308,7 @@ export async function run(args) {
     const scope = opts.global ? 'global' : 'project';
 
     if (opts.command !== 'version') {
-        checkForUpdates();
+        await checkForUpdates();
     }
 
     switch (opts.command) {
