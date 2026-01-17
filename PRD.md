@@ -46,23 +46,23 @@ When a user runs `wtv run` (with no Habakkuk item ID), WTV will:
 - If the loop fails mid-run, WTV stops, prints rollback instructions, and does not auto-push.
 
 ## Tasks
-- [ ] Update `wtv run` routing so `wtv run <id>` stays Habakkuk and `wtv run` starts Vision Runner
-- [ ] Implement vision document discovery + interactive picker (root `VISION.md` + `vision/*.md`)
-- [ ] Add Vision Runner CLI flags: `--vision`, `--engine`, `--resume`, `--regenerate-prd`, `--max-iterations`, `--dry-run`, `--fast`, `--no-tests`, `--no-lint`, `--no-push`
-- [ ] Add engine adapter interface (spawn + streaming output) with support for: `opencode`, `codex`, `claude`
-- [ ] Implement PRD generation prompt that produces `PRD.md` with a `## Tasks` checklist
-- [ ] Create/append `progress.txt` header including start timestamp and start git SHA
-- [ ] Implement loop controller:
-- [ ] Read `PRD.md`, select next `- [ ]` item, and build a strict “one-task only” execution prompt
-- [ ] Invoke engine, then verify the PRD changed and the selected task was marked `- [x]`
-- [ ] Append a checkpoint entry to `progress.txt` after each successful task
-- [ ] Stop when no unchecked tasks remain, or when `--max-iterations` is reached
-- [ ] Add preflight safety checks:
-- [ ] Require git repo (or warn + disable commit/push)
-- [ ] Require clean working tree (or prompt to proceed)
-- [ ] Record rollback hint: `git reset --hard <start-sha>`
-- [ ] Add finalization step:
-- [ ] `git add -A` and create one summary commit at completion
-- [ ] Push once at the end by default; skip when `--no-push`
-- [ ] Update `wtv help` output to document Vision Runner usage
-- [ ] Update `README.md` with Vision Runner (`wtv run`) workflow and file contracts
+- [x] Update `wtv run` routing so `wtv run <id>` stays Habakkuk and `wtv run` starts Vision Runner
+- [x] Implement vision document discovery + interactive picker (root `VISION.md` + `vision/*.md`)
+- [x] Add Vision Runner CLI flags: `--vision`, `--engine`, `--resume`, `--regenerate-prd`, `--max-iterations`, `--dry-run`, `--fast`, `--no-tests`, `--no-lint`, `--no-push`
+- [x] Add engine adapter interface (spawn + streaming output) with support for: `opencode`, `codex`, `claude`
+- [x] Implement PRD generation prompt that produces `PRD.md` with a `## Tasks` checklist
+- [x] Create/append `progress.txt` header including start timestamp and start git SHA
+- [x] Implement loop controller:
+- [x] Read `PRD.md`, select next `- [ ]` item, and build a strict “one-task only” execution prompt
+- [x] Invoke engine, then verify the PRD changed and the selected task was marked `- [x]`
+- [x] Append a checkpoint entry to `progress.txt` after each successful task
+- [x] Stop when no unchecked tasks remain, or when `--max-iterations` is reached
+- [x] Add preflight safety checks:
+- [x] Require git repo (or warn + disable commit/push)
+- [x] Require clean working tree (or prompt to proceed)
+- [x] Record rollback hint: `git reset --hard <start-sha>`
+- [x] Add finalization step:
+- [x] `git add -A` and create one summary commit at completion
+- [x] Push once at the end by default; skip when `--no-push`
+- [x] Update `wtv help` output to document Vision Runner usage
+- [x] Update `README.md` with Vision Runner (`wtv run`) workflow and file contracts

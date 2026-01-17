@@ -296,9 +296,34 @@ The Masterbuilder reads your vision document and coordinates the artisans.
 
 ## Vision Runner (Ralphy-Style)
 
-`wtv run` can also execute a project vision directly by generating a `PRD.md` (checklist) and iterating until all tasks are complete.
+`wtv run` (with no arguments) launches the **Vision Runner**, an autonomous loop that executes a project vision until completion.
 
-It maintains a `progress.txt` checkpoint log and, by default, creates a single git commit and pushes once at the end.
+It is designed for "Ralphy-style" execution: give it a vision, and it runs until the vision is a reality.
+
+### The Workflow
+
+1. **Pick a Vision**: WTV finds `VISION.md` (root) or files in `vision/*.md` and asks you to select one.
+2. **Generate Plan**: It prompts the engine (OpenCode, Codex, or Claude) to generate a detailed `PRD.md` with a task checklist.
+3. **Execute Loop**:
+   - Reads `PRD.md` to find the next unchecked task.
+   - Creates a focused prompt for the engine.
+   - Runs the engine to implement the task.
+   - Verifies the task was marked completed in `PRD.md`.
+   - Appends a checkpoint to `progress.txt`.
+   - Repeats until all tasks are done.
+4. **Finalize**: Creates a single git commit ("feat: complete <vision>") and pushes to remote (unless disabled).
+
+### File Contracts
+
+The Vision Runner relies on strict file conventions:
+
+- **Input**:
+  - `VISION.md` (or `vision/*.md`): The source of truth for *what* to build.
+- **Artifacts**:
+  - `PRD.md`: The execution checklist. Must use `- [ ]` for incomplete and `- [x]` for complete tasks. The runner stops when no `- [ ]` remain.
+  - `progress.txt`: An append-only log of every completed task with timestamps.
+
+### Usage
 
 ```bash
 wtv run

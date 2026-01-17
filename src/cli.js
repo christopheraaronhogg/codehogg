@@ -3265,10 +3265,14 @@ async function runEngine(engine, promptText) {
     }
 
     if (normalized === 'claude') {
-        // Claude Code CLI: avoid stream-json requirements (needs --verbose with --print).
-        // We don't parse output here, so default output is fine.
+        // Claude Code CLI: explicitly force text output so user config
+        // can't switch this to stream-json (which has extra requirements).
         return await new Promise((resolve, reject) => {
-            const child = spawn('claude', ['--dangerously-skip-permissions', '-p', promptText], { stdio: 'inherit' });
+            const child = spawn(
+                'claude',
+                ['--dangerously-skip-permissions', '--print', '--output-format', 'text', promptText],
+                { stdio: 'inherit' },
+            );
             child.on('error', reject);
             child.on('exit', (code) => resolve(code ?? 1));
         });
@@ -3277,13 +3281,12 @@ async function runEngine(engine, promptText) {
     throw new Error(`Unsupported engine: ${engine}`);
 }
 
-function ensureProgressHeader(progressPath, { visionPath, engine, startSha }) {
+export function ensureProgressHeader(progressPath, { visionPath, engine, startSha }) {
     if (!existsSync(progressPath)) {
         writeFileSync(progressPath, '');
     }
 
     const existing = readFileSync(progressPath, 'utf8');
-    if (existing.trim().length > 0) return;
 
     const startedAt = new Date().toISOString();
     const header = [
@@ -3292,16 +3295,19 @@ function ensureProgressHeader(progressPath, { visionPath, engine, startSha }) {
         `Vision: ${visionPath}`,
         `Engine: ${engine}`,
         startSha ? `Start SHA: ${startSha}` : `Start SHA: (not a git repo)`,
+        startSha ? `Rollback hint: git reset --hard ${startSha}` : '',
         '',
     ].join('\n');
 
-    writeFileSync(progressPath, header);
+    if (existing.trim().length > 0) {
+        writeFileSync(progressPath, existing.trimEnd() + '\n\n' + header);
+    } else {
+        writeFileSync(progressPath, header);
+    }
 }
 
-async function generatePrdFromVision({ engine, visionPath, prdPath }) {
-    const visionContent = readFileSync(visionPath, 'utf8');
-
-    const promptText = `You are generating a PRD for a software project.
+export function generatePrdPrompt(visionContent) {
+    return `You are generating a PRD for a software project.
 
 Input vision document:
 ---
@@ -3318,6 +3324,12 @@ Requirements:
 - Do NOT implement any code yet.
 - Do NOT run git commit or git push.
 - Output is the updated files on disk (PRD.md).`;
+}
+
+async function generatePrdFromVision({ engine, visionPath, prdPath }) {
+    const visionContent = readFileSync(visionPath, 'utf8');
+
+    const promptText = generatePrdPrompt(visionContent);
 
     const code = await runEngine(engine, promptText);
     if (code !== 0) {
@@ -3334,7 +3346,7 @@ Requirements:
     }
 }
 
-async function runVisionTaskIteration({ engine, prdPath, progressPath, taskText, noTests, noLint }) {
+export async function runVisionTaskIteration({ engine, prdPath, progressPath, taskText, noTests, noLint, _runEngine }) {
     const promptText = `You are an autonomous coding agent executing a PRD.
 
 Files:
@@ -3362,7 +3374,8 @@ Stop after completing this one task.`;
 
     const progressBefore = existsSync(progressPath) ? readFileSync(progressPath, 'utf8') : '';
 
-    const code = await runEngine(engine, promptText);
+    const runFn = _runEngine || runEngine;
+    const code = await runFn(engine, promptText);
     if (code !== 0) {
         throw new Error(`Engine exited with code ${code}`);
     }
@@ -3382,6 +3395,71 @@ Stop after completing this one task.`;
         const stamp = new Date().toISOString();
         writeFileSync(progressPath, progressAfter + `\n[${stamp}] Completed: ${taskText}\n`);
     }
+}
+
+export function finalizeVisionRun({
+    prdPath,
+    visionPath,
+    hasGit,
+    startSha,
+    noPush,
+    _runGit,
+    _readFileSync,
+    _countUncheckedPrdTasks,
+    _getCurrentBranch
+}) {
+    const runGitFn = _runGit || runGit;
+    const readFileSyncFn = _readFileSync || readFileSync;
+    const countUncheckedFn = _countUncheckedPrdTasks || countUncheckedPrdTasks;
+    const getCurrentBranchFn = _getCurrentBranch || getCurrentBranch;
+
+    if (!hasGit) {
+        console.log(`\n  ${c.green}${sym.check}${c.reset} PRD complete (no git repo detected).\n`);
+        return;
+    }
+
+    const prdFinal = readFileSyncFn(prdPath, 'utf8');
+    if (countUncheckedFn(prdFinal) > 0) {
+        console.log(`\n  ${c.yellow}${sym.warn}${c.reset} PRD still has remaining tasks; skipping commit/push.\n`);
+        return;
+    }
+
+    const visionName = basename(visionPath).replace(/\.md$/, '');
+    const commitMessage = `feat: run vision (${visionName})`;
+
+    const addRes = runGitFn(['add', '-A']);
+    if (addRes.status !== 0) {
+        console.log(`\n  ${c.red}${sym.cross}${c.reset} git add failed.\n`);
+        return;
+    }
+
+    const statusRes = runGitFn(['status', '--porcelain']);
+    if (statusRes.status === 0 && String(statusRes.stdout || '').trim().length === 0) {
+        console.log(`\n  ${c.green}${sym.check}${c.reset} Nothing to commit.\n`);
+        return;
+    }
+
+    const commitRes = runGitFn(['commit', '-m', commitMessage]);
+    if (commitRes.status !== 0) {
+        console.log(`\n  ${c.red}${sym.cross}${c.reset} git commit failed.\n`);
+        return;
+    }
+
+    if (!noPush) {
+        const pushRes = runGitFn(['push']);
+        if (pushRes.status !== 0) {
+            const branch = getCurrentBranchFn();
+            if (branch) {
+                runGitFn(['push', '-u', 'origin', branch]);
+            }
+        }
+    }
+
+    console.log(`\n  ${c.green}${sym.check}${c.reset} Vision complete.`);
+    if (startSha) {
+        console.log(`  Started from: ${c.dim}${startSha}${c.reset}`);
+    }
+    console.log('');
 }
 
 async function visionRunner(opts) {
@@ -3453,6 +3531,12 @@ async function visionRunner(opts) {
 
     const hasGit = isGitRepo();
     const startSha = hasGit ? getGitHeadSha() : null;
+
+    if (!hasGit) {
+        console.log(`\n  ${c.yellow}${sym.warn} Warning:${c.reset} Not a git repository. Version control features disabled.\n`);
+    } else if (startSha) {
+        console.log(`\n  ${c.blue}${sym.info} Rollback hint:${c.reset} git reset --hard ${startSha}\n`);
+    }
 
     if (hasGit && !isWorkingTreeClean() && !opts.dryRun) {
         if (!interactive) {
@@ -3550,53 +3634,13 @@ async function visionRunner(opts) {
         }
     }
 
-    if (!hasGit) {
-        console.log(`\n  ${c.green}${sym.check}${c.reset} PRD complete (no git repo detected).\n`);
-        return;
-    }
-
-    const prdFinal = readFileSync(prdPath, 'utf8');
-    if (countUncheckedPrdTasks(prdFinal) > 0) {
-        console.log(`\n  ${c.yellow}${sym.warn}${c.reset} PRD still has remaining tasks; skipping commit/push.\n`);
-        return;
-    }
-
-    const visionName = basename(visionPath).replace(/\.md$/, '');
-    const commitMessage = `feat: run vision (${visionName})`;
-
-    const addRes = runGit(['add', '-A']);
-    if (addRes.status !== 0) {
-        console.log(`\n  ${c.red}${sym.cross}${c.reset} git add failed.\n`);
-        return;
-    }
-
-    const statusRes = runGit(['status', '--porcelain']);
-    if (statusRes.status === 0 && String(statusRes.stdout || '').trim().length === 0) {
-        console.log(`\n  ${c.green}${sym.check}${c.reset} Nothing to commit.\n`);
-        return;
-    }
-
-    const commitRes = runGit(['commit', '-m', commitMessage]);
-    if (commitRes.status !== 0) {
-        console.log(`\n  ${c.red}${sym.cross}${c.reset} git commit failed.\n`);
-        return;
-    }
-
-    if (!opts.noPush) {
-        const pushRes = runGit(['push']);
-        if (pushRes.status !== 0) {
-            const branch = getCurrentBranch();
-            if (branch) {
-                runGit(['push', '-u', 'origin', branch]);
-            }
-        }
-    }
-
-    console.log(`\n  ${c.green}${sym.check}${c.reset} Vision complete.`);
-    if (startSha) {
-        console.log(`  Started from: ${c.dim}${startSha}${c.reset}`);
-    }
-    console.log('');
+    finalizeVisionRun({
+        prdPath,
+        visionPath,
+        hasGit,
+        startSha,
+        noPush: opts.noPush
+    });
 }
 
 // ============================================================================
@@ -4566,7 +4610,7 @@ function showHelp() {
     console.log(`${pad}  ${c.cyan}vision${c.reset}        Show VISION.md status`);
     console.log(`${pad}  ${c.cyan}log${c.reset}           Show task logs`);
     console.log(`${pad}  ${c.cyan}meet${c.reset}          Meet Paul and the Artisans`);
-    console.log(`${pad}  ${c.cyan}run${c.reset}           Run the vision (PRD loop)`);
+    console.log(`${pad}  ${c.cyan}run${c.reset}           Run the vision (Vision Runner)`);
     console.log(`${pad}  ${c.cyan}help${c.reset}          Show this help\n`);
 
     console.log(`${pad}${c.bold}Agent Commands${c.reset}`);
@@ -4577,12 +4621,17 @@ function showHelp() {
     console.log(`${pad}  ${c.cyan}agents fav${c.reset} <name>   Toggle favorite`);
     console.log(`${pad}  ${c.cyan}agents rm${c.reset} <name>    Remove agent\n`);
 
+    console.log(`${pad}${c.bold}Vision Runner${c.reset}  ${c.dim}"That he may run that readeth it"${c.reset}`);
+    console.log(`${pad}  ${c.cyan}run${c.reset}               Launch Vision Runner (interactive)`);
+    console.log(`${pad}  ${c.cyan}run${c.reset} --vision <f>  Execute specific vision file`);
+    console.log(`${pad}  ${c.cyan}run${c.reset} --resume      Resume existing PRD.md\n`);
+
     console.log(`${pad}${c.bold}Habakkuk Workflow${c.reset}  ${c.dim}"Write the vision, make it plain"${c.reset}`);
     console.log(`${pad}  ${c.cyan}board${c.reset} [--all]        Show kanban board`);
     console.log(`${pad}  ${c.cyan}cry${c.reset} "desc"          Enter a problem or need`);
     console.log(`${pad}  ${c.cyan}wait${c.reset} <id>           Move to waiting (seeking)`);
     console.log(`${pad}  ${c.cyan}vision${c.reset} <id>         Move to vision (answer received)`);
-    console.log(`${pad}  ${c.cyan}run${c.reset} [id]           Run the vision, or move item to run`);
+    console.log(`${pad}  ${c.cyan}run${c.reset} <id>            Move to run (execution started)`);
     console.log(`${pad}  ${c.cyan}worship${c.reset} <id>        Move to worship (retrospective)`);
     console.log(`${pad}  ${c.cyan}note${c.reset} <id> "text"    Add note to item`);
     console.log(`${pad}  ${c.cyan}item${c.reset} <id>           Show item details`);
@@ -4599,6 +4648,18 @@ function showHelp() {
     console.log(`${pad}  ${c.dim}--opencode${c.reset}         Target OpenCode`);
     console.log(`${pad}  ${c.dim}--gemini${c.reset}           Target Gemini CLI`);
     console.log(`${pad}  ${c.dim}--antigravity${c.reset}      Target Antigravity\n`);
+
+    console.log(`${pad}${c.bold}Vision Runner Options${c.reset}`);
+    console.log(`${pad}  ${c.dim}--vision <file>${c.reset}    Input vision file (default: discover)`);
+    console.log(`${pad}  ${c.dim}--engine <name>${c.reset}    Execution engine (opencode|codex|claude)`);
+    console.log(`${pad}  ${c.dim}--resume${c.reset}           Resume existing PRD.md`);
+    console.log(`${pad}  ${c.dim}--regenerate-prd${c.reset}   Force regeneration of PRD.md from vision`);
+    console.log(`${pad}  ${c.dim}--max-iterations <n>${c.reset} Stop after N tasks`);
+    console.log(`${pad}  ${c.dim}--dry-run${c.reset}          Show what would happen without running`);
+    console.log(`${pad}  ${c.dim}--fast${c.reset}             Skip tests and linting`);
+    console.log(`${pad}  ${c.dim}--no-tests${c.reset}         Skip tests`);
+    console.log(`${pad}  ${c.dim}--no-lint${c.reset}          Skip linting`);
+    console.log(`${pad}  ${c.dim}--no-push${c.reset}          Skip git push at end\n`);
 
     console.log(`${pad}${c.bold}Examples${c.reset}`);
     console.log(`${pad}  ${c.green}wtv${c.reset}                          ${c.dim}# Dashboard${c.reset}`);

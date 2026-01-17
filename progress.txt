@@ -1,0 +1,18 @@
+WTV Vision Runner
+Started: 2026-01-17T02:40:13.200Z
+Vision: /Users/chrishogg/Documents/GitHub/codehogg/vision/VISION.md
+Engine: claude
+Start SHA: 21837ff83d6363db4b25aa2b2d3fc471f93ca835
+
+[2026-01-17T02:45:00.000Z] Completed: Update `wtv run` routing so `wtv run <id>` stays Habakkuk and `wtv run` starts Vision Runner
+[2026-01-17T02:48:00.000Z] Completed: Implement vision document discovery + interactive picker (root `VISION.md` + `vision/*.md`)
+[2026-01-17T02:56:38.000Z] Completed: Add Vision Runner CLI flags: --vision, --engine, --resume, --regenerate-prd, --max-iterations, --dry-run, --fast, --no-tests, --no-lint, --no-push
+[2026-01-17T02:59:01.000Z] Completed: Add engine adapter interface (spawn + streaming output) with support for: opencode, codex, claude
+[2026-01-17T03:01:38.000Z] Completed: Implement PRD generation prompt that produces `PRD.md` with a `## Tasks` checklist
+[2026-01-17T03:04:54.000Z] Completed: Create/append progress.txt header including start timestamp and start git SHA
+[2026-01-17T03:07:17.000Z] Completed: Implement loop controller:
+[2026-01-17T03:14:53.000Z] Completed: Add preflight safety checks:
+[2026-01-17T03:19:00.000Z] Completed: Add finalization step:
+[2026-01-17T03:21:26.000Z] Completed: `git add -A` and create one summary commit at completion
+[2026-01-17T03:25:00.000Z] Completed: Push once at the end by default; skip when `--no-push`
+[2026-01-17T03:25:56Z] Completed: Update wtv help output to document Vision Runner usage
