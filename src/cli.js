@@ -1256,14 +1256,22 @@ async function checkForUpdates() {
 
     try {
         const packageName = getPackageName();
+        const checkEveryRun = process.env.WTV_UPDATE_CHECK_EVERY_RUN === '1';
         const notifier = updateNotifier({
             pkg: {
                 name: packageName,
                 version: getVersion(),
             },
-            updateCheckInterval: 1000 * 60 * 60 * 24 * 7,
+            updateCheckInterval: checkEveryRun ? Number.POSITIVE_INFINITY : 1000 * 60 * 60 * 24 * 7,
             shouldNotifyInNpmScript: false,
         });
+
+        if (checkEveryRun) {
+            try {
+                notifier.update = await notifier.fetchInfo();
+            } catch {
+            }
+        }
 
         const update = notifier.update;
         if (!update) return;
@@ -1290,7 +1298,7 @@ Or run latest once:
             },
         });
 
-        const shouldPrompt = process.stdin.isTTY && process.env.WTV_NO_AUTO_UPDATE !== '1' && !process.env.CI;
+        const shouldPrompt = process.stdin.isTTY && process.env.WTV_NO_AUTO_UPDATE !== '1' && !process.env.CI && !checkEveryRun;
         if (!shouldPrompt) return;
 
         const isDevCheckout = existsSync(join(PACKAGE_ROOT, '.git'));
